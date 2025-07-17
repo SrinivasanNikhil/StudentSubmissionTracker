@@ -1,0 +1,19 @@
+{
+	"title": "Delta Data Model",
+	"type": "data model",
+	"details": [
+		{
+			"scenario": "Delta Airlines wants to track: Aircraft details (make, model, last service, acquisition date), Issues identified during inspections (code, description, time, subsystem), Maintenance engineers (name, contact, work logs)",
+			"Tasks": [
+				"Use ChatGPT or another AI tool to generate an initial draft of a data model.",
+				"Review and refine the AI's suggestion: Normalize the schema if needed, Define appropriate data types and constraints, Add relationships and foreign keys",
+				"Create your final ER diagram in MySQL Workbench or another modeling tool."
+			],
+			"Outputs": [
+				"AI-generated model (text or screenshot).",
+				"Final model (screenshot, fitting one page)",
+				"A short explanation of your improvements"
+			]
+		}
+	]
+}

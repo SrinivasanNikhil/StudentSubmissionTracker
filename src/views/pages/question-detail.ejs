@@ -1,0 +1,643 @@
+<div class="container mt-4">
+    <div class="mx-auto" style="max-width: 1200px; margin-left: 2rem; margin-right: 2rem;">
+        <!-- Breadcrumb Navigation -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/topics">Topics</a></li>
+                <li class="breadcrumb-item">
+                    <a href="/questions/topic/<%= question.topicId %>">
+                        <%= question.topic.name %>
+                    </a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">Question #<%= question.id %>
+                </li>
+            </ol>
+        </nav>
+
+        <!-- Question Card -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <h4 class="mb-0">
+                    <i class="bi bi-question-circle me-2"></i>
+                    Question #<%= question.id %>
+                </h4>
+                <span class="badge <%= completed ? 'bg-success' : 'bg-secondary' %> rounded-pill" id="completion-badge">
+                    <i class="bi <%= completed ? 'bi-check-circle' : 'bi-circle' %> me-1"></i>
+                    <%= completed ? 'Completed' : 'Not Completed' %>
+                </span>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title text-muted">
+                    <i class="bi bi-database me-2"></i>
+                    Topic: <%= question.topic.name %>
+                </h5>
+                <p class="card-text lead">
+                    <%= question.questionText %>
+                </p>
+
+                <div class="mt-4">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Questions are automatically marked as completed when your query returns the same number
+                        of rows as the reference solution.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SQL Query Editor Section -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-code-square me-2"></i>
+                    SQL Query Editor
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <!-- Query Editor Column -->
+                    <div class="col-md-8">
+                        <!-- Database Schema Info -->
+                        <div class="schema-info mb-4">
+                            <div class="alert alert-secondary mb-0" role="button" data-bs-toggle="collapse"
+                                data-bs-target="#schemaDetails">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Click to view <%= question.topic.database %> database tables and their schemas
+                            </div>
+                            <div class="collapse mt-3" id="schemaDetails">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-3">
+                                            <i class="bi bi-database me-2"></i>
+                                            Database: <%= question.topic.database %>
+                                        </h6>
+                                        <% if (question.topic.database==='ClassicModels' ) { %>
+                                            <pre class="bg-light p-3 rounded"><code>
+Customers (customerNumber, customerName, contactLastName, contactFirstName, phone, addressLine1, addressLine2, city, state, postalCode, country, salesRepEmployeeNumber, creditLimit)
+Employees (employeeNumber, lastName, firstName, extension, email, officeCode, reportsTo, jobTitle)
+Offices (officeCode, city, phone, addressLine1, addressLine2, state, country, postalCode, territory)
+Orders (orderNumber, orderDate, requiredDate, shippedDate, status, comments, customerNumber)
+OrderDetails (orderNumber, productCode, quantityOrdered, priceEach, orderLineNumber)
+Payments (customerNumber, checkNumber, paymentDate, amount)
+Products (productCode, productName, productLine, productScale, productVendor, productDescription, quantityInStock, buyPrice, MSRP)
+ProductLines (productLine, textDescription, htmlDescription, image)
+                                            </code></pre>
+                                            <% } else { %>
+                                                <pre class="bg-light p-3 rounded"><code>
+Categories (CategoryID, CategoryName, Description, Picture)
+Customers (CustomerID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax)
+Employees (EmployeeID, LastName, FirstName, Title, TitleOfCourtesy, BirthDate, HireDate, Address, City, Region, PostalCode, Country, HomePhone, Extension, Photo, Notes, ReportsTo, PhotoPath)
+EmployeeTerritories (EmployeeID, TerritoryID)
+Order Details (OrderID, ProductID, UnitPrice, Quantity, Discount)
+Orders (OrderID, CustomerID, EmployeeID, OrderDate, RequiredDate, ShippedDate, ShipVia, Freight, ShipName, ShipAddress, ShipCity, ShipRegion, ShipPostalCode, ShipCountry)
+Products (ProductID, ProductName, SupplierID, CategoryID, QuantityPerUnit, UnitPrice, UnitsInStock, UnitsOnOrder, ReorderLevel, Discontinued)
+Region (RegionID, RegionDescription)
+Shippers (ShipperID, CompanyName, Phone)
+Suppliers (SupplierID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax, HomePage)
+Territories (TerritoryID, TerritoryDescription, RegionID)
+                                            </code></pre>
+                                                <% } %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="sqlQuery" class="form-label">Your SQL Query</label>
+                            <textarea class="form-control code-editor" id="sqlQuery" rows="6"
+                                placeholder="Enter your SQL query here..."></textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button id="executeQueryBtn" class="btn btn-primary">
+                                <i class="bi bi-play-fill me-2"></i> Execute Query
+                            </button>
+                            <button id="clearQueryBtn" class="btn btn-outline-secondary">
+                                <i class="bi bi-eraser me-2"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Real-time Feedback Column -->
+                    <div class="col-md-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-robot me-2"></i>
+                                    AI Assistant
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="realtime-feedback" class="realtime-feedback">
+                                    <div class="text-muted">
+                                        <i class="bi bi-robot me-2"></i>
+                                        Start typing your query to get real-time feedback...
+                                    </div>
+                                </div>
+                                <div id="realtime-loading" class="text-center mt-3" style="display: none;">
+                                    <div class="spinner-border text-primary spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <small class="text-muted">Analyzing your query...</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SQL Query Results Section -->
+        <div id="results-section" style="display: none;">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table me-2"></i>
+                        Query Results
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="execution-status" class="mb-3">&nbsp;</div>
+
+                    <div class="table-responsive">
+                        <table id="results-table" class="table table-striped table-bordered">
+                            <thead id="results-thead"></thead>
+                            <tbody id="results-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Query Feedback Section -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="bi bi-graph-up me-2"></i>
+                        Query Match Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="feedback-box" class="alert mb-3" role="alert"></div>
+
+                    <div id="differences-container">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="showReferenceQuery">
+                                <label class="form-check-label" for="showReferenceQuery">
+                                    Show Reference Query
+                                </label>
+                            </div>
+                        </div>
+                        <div id="reference-query-container" style="display: none;">
+                            <h6 class="text-muted mb-3">
+                                <i class="bi bi-code-square me-2"></i>
+                                Reference Query:
+                            </h6>
+                            <pre class="bg-light p-3 rounded"><code id="reference-query"></code></pre>
+                            <div class="mt-3">
+                                <button id="compareWithChatGPT" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-robot me-2"></i>
+                                    Compare with ChatGPT
+                                </button>
+                            </div>
+                            <div id="chatgpt-analysis" class="mt-3" style="display: none;">
+                                <h6 class="text-muted mb-3">
+                                    <i class="bi bi-robot me-2"></i>
+                                    ChatGPT Analysis:
+                                </h6>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div id="chatgpt-loading" class="text-center" style="display: none;">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </div>
+                                        <div id="chatgpt-content"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-list-check me-2"></i>
+                            Query Comparison:
+                        </h6>
+                        <ul id="differences-list" class="list-group"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <a href="/questions/topic/<%= question.topicId %>" class="btn btn-secondary">
+                <i class="bi bi-arrow-left me-2"></i>
+                Back to Questions
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden field with question ID for JavaScript -->
+<input type="hidden" id="questionId" value="<%= question.id %>">
+
+<style>
+    .code-editor {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .schema-info pre {
+        margin-bottom: 0;
+    }
+
+    .card {
+        border-radius: 0.5rem;
+    }
+
+    .alert {
+        border-radius: 0.5rem;
+    }
+
+    .table {
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+</style>
+
+<!-- JavaScript for SQL Editor -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const sqlQuery = document.getElementById('sqlQuery');
+        const executeBtn = document.getElementById('executeQueryBtn');
+        const clearBtn = document.getElementById('clearQueryBtn');
+        const questionId = document.getElementById('questionId').value;
+        const resultsSection = document.getElementById('results-section');
+        const executionStatus = document.getElementById('execution-status');
+        const resultsTable = document.getElementById('results-table');
+        const resultsThead = document.getElementById('results-thead');
+        const resultsTbody = document.getElementById('results-tbody');
+        const feedbackBox = document.getElementById('feedback-box');
+        const differencesList = document.getElementById('differences-list');
+        const differencesContainer = document.getElementById('differences-container');
+        const completionBadge = document.getElementById('completion-badge');
+        const showReferenceQuery = document.getElementById('showReferenceQuery');
+        const referenceQueryContainer = document.getElementById('reference-query-container');
+        const referenceQueryElement = document.getElementById('reference-query');
+        const compareWithChatGPTBtn = document.getElementById('compareWithChatGPT');
+        const chatgptAnalysis = document.getElementById('chatgpt-analysis');
+        const chatgptLoading = document.getElementById('chatgpt-loading');
+        const chatgptContent = document.getElementById('chatgpt-content');
+
+        // Execute query button click
+        executeBtn.addEventListener('click', async function () {
+            const query = sqlQuery.value.trim();
+
+            if (!query) {
+                executionStatus.className = 'alert alert-warning';
+                executionStatus.textContent = 'Please enter a SQL query to execute.';
+                resultsSection.style.display = 'block';
+                return;
+            }
+
+            try {
+                // Show loading state
+                executeBtn.disabled = true;
+                executeBtn.innerHTML = '<i class="bi bi-hourglass"></i> Executing...';
+                executionStatus.className = 'alert alert-info';
+                executionStatus.textContent = 'Executing your query...';
+                resultsSection.style.display = 'block';
+
+                // Send query to server
+                const response = await fetch(`/questions/${questionId}/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query })
+                });
+
+                const result = await response.json();
+
+                // Clear previous results
+                resultsThead.innerHTML = '';
+                resultsTbody.innerHTML = '';
+                feedbackBox.innerHTML = '';
+                differencesList.innerHTML = '';
+                differencesContainer.style.display = 'none';
+
+                // Always show the results section and execution status
+                resultsSection.style.display = 'block';
+                executionStatus.style.display = 'block';
+
+                // Log the result for debugging
+                console.log('Query execution result:', result);
+
+                if (!result.success) {
+                    // Handle API-level error
+                    //alert(result.executionResult.error);
+                    executionStatus.className = 'alert alert-danger';
+                    let errorMessage = `<div class="error-details">`;
+
+                    // Display the main error message
+                    errorMessage += `<div class="mb-2"><strong>Error:</strong> ${result.executionResult.message || 'An error occurred'}</div>`;
+
+                    // If there's an execution result with error details, display them
+                    if (result.executionResult && !result.executionResult.success) {
+
+                        errorMessage += `<div class="mt-2"><strong>Database Error:</strong> ${result.executionResult.message || 'Unknown database error'}</div>`;
+
+                        // Add the full error string if available
+                        if (result.executionResult.error) {
+
+                            errorMessage += `<div class="mt-2"><strong>Technical Details:</strong><br><code>${result.executionResult.error}</code></div>`;
+                        }
+
+                        // Add additional error details in a collapsible section
+                        if (result.executionResult.errorCode || result.executionResult.errorState || result.executionResult.errorNumber) {
+
+                            errorMessage += `<div class="mt-2">
+                                <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#errorDetails">
+                                    Show Additional Error Details
+                                </button>
+                                <div class="collapse mt-2" id="errorDetails">
+                                    <div class="card card-body bg-light">
+                                        ${result.executionResult.errorCode ? `<div><strong>Error Code:</strong> ${result.executionResult.errorCode}</div>` : ''}
+                                        ${result.executionResult.errorState ? `<div><strong>SQL State:</strong> ${result.executionResult.errorState}</div>` : ''}
+                                        ${result.executionResult.errorNumber ? `<div><strong>Error Number:</strong> ${result.executionResult.errorNumber}</div>` : ''}
+                                    </div>
+                                </div>
+                            </div>`;
+                        }
+                    }
+
+                    errorMessage += `</div>`;
+                    executionStatus.innerHTML = errorMessage;
+
+                    // Ensure the results section is visible and scroll to it
+                    resultsSection.style.display = 'block';
+                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    return;
+                }
+
+                // Handle the execution result
+                const execResult = result.executionResult;
+                const databaseName = result.databaseName || 'Unknown';
+
+                if (execResult.success) {
+                    // Query executed successfully
+                    executionStatus.className = 'alert alert-success';
+                    executionStatus.textContent = `Query executed successfully on ${databaseName} database. Returned ${execResult.rows} row(s).`;
+
+                    // Populate the results table
+                    resultsThead.innerHTML = '';
+                    resultsTbody.innerHTML = '';
+
+                    if (execResult.columns && execResult.columns.length > 0) {
+                        // Create the table header
+                        const headerRow = document.createElement('tr');
+                        execResult.columns.forEach(column => {
+                            const th = document.createElement('th');
+                            th.textContent = column;
+                            headerRow.appendChild(th);
+                        });
+                        resultsThead.appendChild(headerRow);
+
+                        // Create the table rows
+                        execResult.data.forEach(row => {
+                            const tr = document.createElement('tr');
+                            execResult.columns.forEach(column => {
+                                const td = document.createElement('td');
+                                td.textContent = row[column] !== null && row[column] !== undefined
+                                    ? row[column]
+                                    : 'NULL';
+                                tr.appendChild(td);
+                            });
+                            resultsTbody.appendChild(tr);
+                        });
+                    } else {
+                        resultsTbody.innerHTML = '<tr><td class="text-center">No results returned</td></tr>';
+                    }
+                } else {
+                    // Query execution failed - display detailed error information
+                    executionStatus.className = 'alert alert-danger';
+                    let errorMessage = `<div class="error-details">`;
+
+                    // Add the main error message in a more prominent way
+                    errorMessage += `<div class="mb-2"><strong>Database Error:</strong> ${execResult.message}</div>`;
+
+                    // Add the full error string if available (this contains the actual database error)
+                    if (execResult.error) {
+                        errorMessage += `<div class="mt-2"><strong>Technical Details:</strong><br><code>${execResult.error}</code></div>`;
+                    }
+
+                    // Add additional error details in a collapsible section
+                    if (execResult.errorCode || execResult.errorState || execResult.errorNumber) {
+                        errorMessage += `<div class="mt-2">
+                            <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#errorDetails">
+                                Show Additional Error Details
+                            </button>
+                            <div class="collapse mt-2" id="errorDetails">
+                                <div class="card card-body bg-light">
+                                    ${execResult.errorCode ? `<div><strong>Error Code:</strong> ${execResult.errorCode}</div>` : ''}
+                                    ${execResult.errorState ? `<div><strong>SQL State:</strong> ${execResult.errorState}</div>` : ''}
+                                    ${execResult.errorNumber ? `<div><strong>Error Number:</strong> ${execResult.errorNumber}</div>` : ''}
+                                </div>
+                            </div>
+                        </div>`;
+                    }
+
+                    errorMessage += `</div>`;
+                    executionStatus.innerHTML = errorMessage;
+                }
+
+                // Handle comparison results if available
+                if (result.comparison) {
+                    const comparison = result.comparison;
+
+                    // Show feedback
+                    feedbackBox.textContent = comparison.feedback;
+                    feedbackBox.className = comparison.isCorrect
+                        ? 'alert alert-success'
+                        : 'alert alert-warning';
+
+                    // Always show the match summary container
+                    differencesContainer.style.display = 'block';
+                    differencesList.innerHTML = '';
+
+                    // Set the reference query
+                    if (result.executionResult && result.executionResult.solution) {
+                        referenceQueryElement.textContent = result.executionResult.solution;
+                    } else {
+                        referenceQueryElement.textContent = 'Reference query not available';
+                    }
+
+                    // Add a header to summarize what matched/didn't match
+                    const summaryLi = document.createElement('li');
+                    summaryLi.className = 'list-group-item list-group-item-primary';
+                    summaryLi.innerHTML = '<strong>Query Match Summary:</strong>';
+
+                    // Add icons for row and column match status
+                    if (comparison.rowsMatch) {
+                        summaryLi.innerHTML += ' <span class="text-success"><i class="bi bi-check-circle"></i> Rows match</span>';
+                    } else {
+                        summaryLi.innerHTML += ' <span class="text-danger"><i class="bi bi-x-circle"></i> Rows differ</span>';
+                    }
+
+                    if (comparison.columnsMatch && comparison.columnNamesMatch) {
+                        summaryLi.innerHTML += ' <span class="text-success"><i class="bi bi-check-circle"></i> Columns match</span>';
+                    } else {
+                        summaryLi.innerHTML += ' <span class="text-danger"><i class="bi bi-x-circle"></i> Columns differ</span>';
+                    }
+
+                    differencesList.appendChild(summaryLi);
+
+                    // Show differences if any
+                    if (comparison.differences && comparison.differences.length > 0) {
+                        // Add individual differences
+                        const differencesHeaderLi = document.createElement('li');
+                        differencesHeaderLi.className = 'list-group-item list-group-item-secondary';
+                        differencesHeaderLi.innerHTML = '<strong>Differences Found:</strong>';
+                        differencesList.appendChild(differencesHeaderLi);
+
+                        comparison.differences.forEach(diff => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item';
+                            li.textContent = diff;
+                            differencesList.appendChild(li);
+                        });
+                    } else if (comparison.isCorrect) {
+                        // If there are no differences and the query is correct, add a success message
+                        const perfectMatchLi = document.createElement('li');
+                        perfectMatchLi.className = 'list-group-item list-group-item-success';
+                        perfectMatchLi.innerHTML = '<i class="bi bi-award"></i> <strong>Perfect match!</strong> Your query returns exactly the same results as the reference solution.';
+                        differencesList.appendChild(perfectMatchLi);
+                    }
+                }
+
+                // Handle completion status update
+                if (result.isCompleted) {
+                    completionBadge.className = 'badge bg-success';
+                    completionBadge.textContent = 'Completed';
+
+                    // Add a success message about completion
+                    if (execResult.success && feedbackBox) {
+                        feedbackBox.innerHTML += '<br><strong>Great job!</strong> This question has been marked as completed.';
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error executing query:', error);
+                executionStatus.className = 'alert alert-danger';
+                executionStatus.textContent = 'An error occurred while executing the query. Please try again.';
+            } finally {
+                // Reset button state
+                executeBtn.disabled = false;
+                executeBtn.innerHTML = '<i class="bi bi-play-fill"></i> Execute Query';
+            }
+        });
+
+        // Clear button click
+        clearBtn.addEventListener('click', function () {
+            sqlQuery.value = '';
+            sqlQuery.focus();
+        });
+
+        // Add event listener for the checkbox
+        showReferenceQuery.addEventListener('change', function () {
+            referenceQueryContainer.style.display = this.checked ? 'block' : 'none';
+        });
+
+        // Add event listener for ChatGPT comparison
+        compareWithChatGPTBtn.addEventListener('click', async function () {
+            const userQuery = sqlQuery.value.trim();
+            const referenceQuery = referenceQueryElement.textContent;
+
+            if (!userQuery || !referenceQuery) {
+                alert('Both queries are required for comparison');
+                return;
+            }
+
+            try {
+                // Show loading state
+                chatgptLoading.style.display = 'block';
+                chatgptContent.innerHTML = '';
+                chatgptAnalysis.style.display = 'block';
+
+                // Send queries to server for ChatGPT analysis
+                const response = await fetch(`/questions/${questionId}/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userQuery,
+                        referenceQuery
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    chatgptContent.innerHTML = result.analysis;
+                } else {
+                    chatgptContent.innerHTML = `<div class="alert alert-danger">${result.message || 'Failed to analyze queries'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error analyzing queries:', error);
+                chatgptContent.innerHTML = '<div class="alert alert-danger">Failed to analyze queries. Please try again.</div>';
+            } finally {
+                chatgptLoading.style.display = 'none';
+            }
+        });
+
+        // Real-time query analysis
+        let analysisTimeout;
+        const realtimeFeedback = document.getElementById('realtime-feedback');
+        const realtimeLoading = document.getElementById('realtime-loading');
+
+        sqlQuery.addEventListener('input', function () {
+            const query = this.value.trim();
+
+            // Clear previous timeout
+            if (analysisTimeout) {
+                clearTimeout(analysisTimeout);
+            }
+
+            // Only analyze if query has at least 5 words
+            const wordCount = query.split(/\s+/).filter(word => word.length > 0).length;
+            if (wordCount < 5) {
+                realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-robot"></i> Start typing your query to get real-time feedback...</div>';
+                return;
+            }
+
+            // Show loading state
+            realtimeLoading.style.display = 'block';
+            realtimeFeedback.innerHTML = '';
+
+            // Set a timeout to debounce the API call
+            analysisTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/questions/${questionId}/analyze-realtime`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ query })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        realtimeFeedback.innerHTML = result.analysis;
+                    } else {
+                        realtimeFeedback.innerHTML = `<div class="alert alert-warning">${result.message || 'Failed to analyze query'}</div>`;
+                    }
+                } catch (error) {
+                    console.error('Error analyzing query:', error);
+                    realtimeFeedback.innerHTML = '<div class="alert alert-danger">Failed to analyze query. Please try again.</div>';
+                } finally {
+                    realtimeLoading.style.display = 'none';
+                }
+            }, 1000); // 1 second debounce
+        });
+    });
+</script>

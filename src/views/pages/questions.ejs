@@ -1,0 +1,288 @@
+<div class="container mt-4" data-topic-type="<%= topic.type %>">
+    <div class="mx-auto" style="max-width: 1200px; margin-left: 2rem; margin-right: 2rem;">
+        <div class="text-center mb-5">
+            <h1 class="display-4 mb-3">
+                <i class="bi bi-database me-2"></i>
+                <%= topic.name %>
+            </h1>
+            <% if (topic.type==='sql' ) { %>
+                <p class="lead text-muted">
+                    <%= topic.description %>
+                </p>
+                <% } %>
+        </div>
+
+        <% if (topic.type==='sql' ) { %>
+            <div class="list-group">
+                <% questions.forEach(question=> { %>
+                    <div class="list-group-item list-group-item-action p-4 mb-3 shadow-sm hover-shadow">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="flex-grow-1 me-3">
+                                <h5 class="mb-2">
+                                    <a href="/questions/<%= question.id %>" class="text-decoration-none text-dark">
+                                        <%= question.questionText %>
+                                    </a>
+                                </h5>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <% if (question.completed) { %>
+                                    <span class="badge bg-success rounded-pill me-2">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Completed
+                                    </span>
+                                    <% } %>
+                                        <a href="/questions/<%= question.id %>" class="btn btn-outline-primary btn-sm">
+                                            View Details
+                                            <i class="bi bi-arrow-right ms-1"></i>
+                                        </a>
+                            </div>
+                        </div>
+                    </div>
+                    <% }); %>
+            </div>
+            <% } else if (topic.type==='data_model' ) { %>
+                <div class="row g-4">
+                    <% questions.forEach(question=> { %>
+                        <div class="col-md-12">
+                            <div class="card h-100 shadow-sm hover-shadow" id="question-card-<%= question.id %>">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <h5 class="card-title mb-0" id="question-title-<%= question.id %>">
+                                            <%= question.questionText %>
+                                        </h5>
+                                        <% if (question.completed) { %>
+                                            <span class="badge bg-success rounded-pill"
+                                                id="completion-badge-<%= question.id %>">
+                                                <i class="bi bi-check-circle me-1"></i>
+                                                Completed
+                                            </span>
+                                            <% } %>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <h6 class="text-muted mb-2">Scenario:</h6>
+                                        <p class="card-text" id="scenario-<%= question.id %>">
+                                            <%= question.modelDescription %>
+                                        </p>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <h6 class="text-muted mb-2">Required Outputs:</h6>
+                                        <ul class="list-group list-group-flush">
+                                            <% if (question.expectedOutputs) { %>
+                                                <% JSON.parse(question.expectedOutputs).forEach(output=> { %>
+                                                    <li class="list-group-item">
+                                                        <i class="bi bi-check2 text-success me-2"></i>
+                                                        <%= output %>
+                                                    </li>
+                                                    <% }); %>
+                                                        <% } %>
+                                        </ul>
+                                    </div>
+
+                                    <% if (!question.completed) { %>
+                                        <div class="mt-auto">
+                                            <!-- ER Diagram Upload -->
+                                            <div class="mb-3">
+                                                <label for="diagram-<%= question.id %>" class="form-label">Upload ER
+                                                    Diagram (PNG only):</label>
+                                                <input type="file" class="form-control" id="diagram-<%= question.id %>"
+                                                    accept=".png" required>
+                                                <div class="form-text">Maximum file size: 5MB</div>
+                                            </div>
+
+                                            <!-- Enhancements Explanation -->
+                                            <div class="mb-3">
+                                                <label for="enhancements-<%= question.id %>"
+                                                    class="form-label">Enhancements to Base Scenario:</label>
+                                                <textarea class="form-control" id="enhancements-<%= question.id %>"
+                                                    rows="4" required
+                                                    placeholder="Explain any enhancements or modifications you made to the base scenario..."></textarea>
+                                            </div>
+
+                                            <!-- AI Reflection -->
+                                            <div class="mb-3">
+                                                <label for="aiReflection-<%= question.id %>" class="form-label">AI Tool
+                                                    Usage Reflection:</label>
+                                                <textarea class="form-control" id="aiReflection-<%= question.id %>"
+                                                    rows="4" required
+                                                    placeholder="Reflect on how you used AI tools to assist in creating this ER diagram..."></textarea>
+                                            </div>
+
+                                            <button class="btn btn-primary w-100" id="submit-button-<%= question.id %>"
+                                                data-question-id="<%= question.id %>"
+                                                onclick="submitAnswer(this.dataset.questionId)">
+                                                Submit Answer
+                                                <i class="bi bi-send ms-2"></i>
+                                            </button>
+                                        </div>
+                                        <% } else { %>
+                                            <div class="mt-auto">
+                                                <a href="/er-diagrams/my-submission/<%= question.id %>"
+                                                    class="btn btn-outline-primary w-100">
+                                                    <i class="bi bi-eye me-2"></i>
+                                                    View My Submission
+                                                </a>
+                                            </div>
+                                            <% } %>
+                                </div>
+                            </div>
+                        </div>
+                        <% }); %>
+                </div>
+                <% } %>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5 class="modal-title" id="loadingModalLabel">Submitting ER Diagram</h5>
+                <p class="text-muted">Please wait while we process your submission...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-shadow {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .list-group-item {
+        border-radius: 0.5rem !important;
+    }
+
+    .card {
+        border-radius: 0.5rem;
+    }
+</style>
+
+<script>
+    async function submitAnswer(questionId) {
+        const diagramFile = document.getElementById(`diagram-${questionId}`).files[0];
+        const enhancements = document.getElementById(`enhancements-${questionId}`).value.trim();
+        const aiReflection = document.getElementById(`aiReflection-${questionId}`).value.trim();
+        const submitButton = document.getElementById(`submit-button-${questionId}`);
+
+        // Enhanced validation with specific error messages
+        if (!diagramFile) {
+            showToast('error', 'Please upload an ER diagram before submitting.');
+            return;
+        }
+
+        if (!diagramFile.type.match('image/png')) {
+            showToast('error', 'Only PNG files are allowed for ER diagrams.');
+            return;
+        }
+
+        if (diagramFile.size > 5 * 1024 * 1024) { // 5MB limit
+            showToast('error', 'Diagram file size must be less than 5MB.');
+            return;
+        }
+
+        if (!enhancements) {
+            showToast('error', 'Please provide an explanation of your enhancements to the base scenario.');
+            return;
+        }
+
+        if (enhancements.length < 10) {
+            showToast('error', 'Please provide a more detailed explanation of your enhancements.');
+            return;
+        }
+
+        if (!aiReflection) {
+            showToast('error', 'Please provide your reflection on AI tool usage.');
+            return;
+        }
+
+        if (aiReflection.length < 10) {
+            showToast('error', 'Please provide a more detailed reflection on your AI tool usage.');
+            return;
+        }
+
+        try {
+            // Disable submit button and show loading modal
+            submitButton.disabled = true;
+            const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+            loadingModal.show();
+
+            const formData = new FormData();
+            formData.append('diagram', diagramFile);
+            formData.append('enhancements', enhancements);
+            formData.append('aiReflection', aiReflection);
+
+            const submitResponse = await fetch(`/er-diagrams/submit/${questionId}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await submitResponse.json();
+
+            if (!submitResponse.ok) {
+                throw new Error(result.message || 'Failed to submit answer');
+            }
+
+            // Update UI to show completion
+            const questionCard = document.getElementById(`question-card-${questionId}`);
+            const completionBadge = document.createElement('span');
+            completionBadge.className = 'badge bg-success ms-2';
+            completionBadge.textContent = 'Completed';
+            questionCard.querySelector('.card-title').appendChild(completionBadge);
+
+            // Disable inputs and show success message
+            document.getElementById(`diagram-${questionId}`).disabled = true;
+            document.getElementById(`enhancements-${questionId}`).disabled = true;
+            document.getElementById(`aiReflection-${questionId}`).disabled = true;
+            submitButton.disabled = true;
+
+            showToast('success', 'Answer submitted successfully!');
+        } catch (error) {
+            console.error('Error submitting answer:', error);
+            showToast('error', error.message || 'Failed to submit answer. Please try again.');
+        } finally {
+            // Re-enable submit button and hide loading modal
+            submitButton.disabled = false;
+            const loadingModal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
+            if (loadingModal) {
+                loadingModal.hide();
+            }
+        }
+    }
+
+    // Helper function to show toast notifications
+    function showToast(type, message) {
+        const toast = document.createElement('div');
+        toast.className = 'position-fixed bottom-0 end-0 p-3';
+        toast.style.zIndex = '5';
+
+        const icon = type === 'success' ? 'check-circle' : 'exclamation-circle';
+        const bgClass = type === 'success' ? 'bg-success' : 'bg-danger';
+
+        toast.innerHTML = `
+            <div class="toast show" role="alert">
+                <div class="toast-header">
+                    <i class="bi bi-${icon} text-${type} me-2"></i>
+                    <strong class="me-auto">${type === 'success' ? 'Success' : 'Error'}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+</script>

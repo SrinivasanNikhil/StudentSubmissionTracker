@@ -1,0 +1,134 @@
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-diagram-3 me-2"></i>
+                        Submit ER Diagram
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form id="erDiagramForm" enctype="multipart/form-data">
+                        <!-- Question Details -->
+                        <div class="mb-4">
+                            <h5>Question Details</h5>
+                            <p class="text-muted">
+                                <%= question.questionText %>
+                            </p>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>Base Scenario:</h6>
+                                    <p>
+                                        <%= question.modelDescription %>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Diagram Upload -->
+                        <div class="mb-4">
+                            <label for="diagram" class="form-label">Upload ER Diagram (PNG only)</label>
+                            <input type="file" class="form-control" id="diagram" name="diagram" accept=".png" required>
+                            <div class="form-text">Maximum file size: 5MB</div>
+                        </div>
+
+                        <!-- Enhancements -->
+                        <div class="mb-4">
+                            <label for="enhancements" class="form-label">Enhancements to Base Scenario</label>
+                            <textarea class="form-control" id="enhancements" name="enhancements" rows="4" required
+                                placeholder="Explain any enhancements or modifications you made to the base scenario..."></textarea>
+                        </div>
+
+                        <!-- AI Reflection -->
+                        <div class="mb-4">
+                            <label for="aiReflection" class="form-label">AI Tool Usage Reflection</label>
+                            <textarea class="form-control" id="aiReflection" name="aiReflection" rows="4" required
+                                placeholder="Reflect on how you used AI tools to assist in creating this ER diagram..."></textarea>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary" id="submitButton">
+                                <i class="bi bi-send me-2"></i>
+                                Submit
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5 class="mb-0">Processing Submission</h5>
+                <p class="text-muted">Please wait while we process your ER diagram...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('erDiagramForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const form = e.target;
+        const formData = new FormData(form);
+        const submitButton = document.getElementById('submitButton');
+        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+
+        try {
+            // Show loading modal
+            loadingModal.show();
+            submitButton.disabled = true;
+
+            const response = await fetch(`/er-diagrams/submit/<%= question.id %>`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Show success message
+                const toast = document.createElement('div');
+                toast.className = 'position-fixed bottom-0 end-0 p-3';
+                toast.style.zIndex = '5';
+                toast.innerHTML = `
+                    <div class="toast show" role="alert">
+                        <div class="toast-header">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            <strong class="me-auto">Success</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                        </div>
+                        <div class="toast-body">
+                            Your ER diagram has been submitted successfully!
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+
+                // Redirect to questions page after 2 seconds
+                setTimeout(() => {
+                    window.location.href = '/questions/topic/<%= question.topicId %>';
+                }, 2000);
+            } else {
+                throw new Error(data.message || 'Submission failed');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message || 'Error submitting ER diagram. Please try again.');
+        } finally {
+            loadingModal.hide();
+            submitButton.disabled = false;
+        }
+    });
+</script>

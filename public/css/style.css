@@ -1,0 +1,139 @@
+/* Custom styles for SQL Practice application */
+
+body {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
+
+main {
+	flex: 1;
+}
+
+footer {
+	margin-top: auto;
+}
+
+/* Card hover effect */
+.card {
+	transition: transform 0.2s;
+}
+
+.card:hover {
+	transform: translateY(-5px);
+}
+
+/* Custom badge styles */
+.badge {
+	font-size: 0.8rem;
+	padding: 0.5em 0.8em;
+}
+
+/* Jumbotron styles (Bootstrap 5 doesn't have jumbotron) */
+.jumbotron {
+	padding: 2rem 1rem;
+	margin-bottom: 2rem;
+	background-color: #e9ecef;
+	border-radius: 0.3rem;
+}
+
+/* Question list item hover */
+.list-group-item {
+	transition: background-color 0.2s;
+}
+
+.list-group-item:hover {
+	background-color: #f8f9fa;
+}
+
+/* Completed question styling */
+.badge.bg-success {
+	background-color: #28a745 !important;
+}
+
+/* Not completed question styling */
+.badge.bg-secondary {
+	background-color: #6c757d !important;
+}
+
+/* SQL Editor specific styles */
+.code-editor {
+	font-family: "Courier New", Courier, monospace;
+	font-size: 14px;
+	line-height: 1.5;
+	tab-size: 4;
+	white-space: pre;
+	background-color: #f8f9fa;
+	border: 1px solid #dee2e6;
+	border-radius: 4px;
+	padding: 10px;
+}
+
+.table-responsive {
+	max-height: 500px;
+	overflow-y: auto;
+}
+
+#results-table th {
+	position: sticky;
+	top: 0;
+	background-color: #f1f1f1;
+}
+
+#differences-container {
+	margin-top: 15px;
+}
+
+#differences-list {
+	margin-top: 10px;
+}
+
+#differences-list .list-group-item {
+	padding: 8px 12px;
+	font-size: 14px;
+}
+
+/* Database schema info */
+.schema-info {
+	font-size: 14px;
+	background-color: #f8f9fa;
+	border-radius: 4px;
+	padding: 10px;
+	margin-bottom: 20px;
+}
+
+.schema-info pre {
+	margin-bottom: 0;
+}
+
+.schema-info h6 {
+	font-weight: 600;
+	margin-bottom: 5px;
+}
+
+.schema-toggle {
+	cursor: pointer;
+	color: #0d6efd;
+}
+
+.schema-toggle:hover {
+	text-decoration: underline;
+}
+
+/* Data model question styles */
+.data-model-card {
+	border-left: 4px solid #0d6efd;
+}
+
+.data-model-card .card-title {
+	color: #0d6efd;
+}
+
+/* SQL question styles */
+.sql-card {
+	border-left: 4px solid #198754;
+}
+
+.sql-card .card-title {
+	color: #198754;
+}

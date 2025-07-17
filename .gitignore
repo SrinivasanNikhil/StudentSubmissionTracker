@@ -1,0 +1,13 @@
+node_modules/
+.env
+.DS_Store
+npm-debug.log
+*.sqlite
+*.sqlite-journal
+coverage/
+.vscode/ 
+deployment-lightsail.md
+deployment-modifications.md
+deployment-railway.md
+cookies.txt
+.cursor/

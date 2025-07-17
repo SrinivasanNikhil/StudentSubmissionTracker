@@ -1,0 +1,131 @@
+<div class="container mt-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/topics">Topics</a></li>
+            <li class="breadcrumb-item">
+                <a href="/questions/topic/<%= submission.question.topicId %>">
+                    <%= submission.question.topic ? submission.question.topic.name : 'Questions' %>
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">My Submission</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-md-8">
+            <!-- Question Details -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Question Details</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Question:</h6>
+                    <p>
+                        <%= submission.question.questionText %>
+                    </p>
+                    <h6>Base Scenario:</h6>
+                    <p>
+                        <%= submission.question.modelDescription %>
+                    </p>
+                </div>
+            </div>
+
+            <!-- ER Diagram -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Your ER Diagram</h5>
+                </div>
+                <div class="card-body">
+                    <img src="<%= submission.diagramImage %>" class="img-fluid" alt="ER Diagram">
+                </div>
+            </div>
+
+            <!-- Student Enhancements -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Your Enhancements</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <%= submission.enhancements %>
+                    </p>
+                </div>
+            </div>
+
+            <!-- AI Reflection -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">AI Tool Usage Reflection</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <%= submission.aiReflection %>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Submission Info -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Submission Info</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6>Submitted:</h6>
+                        <p class="mb-0">
+                            <%= new Date(submission.completedAt).toLocaleString() %>
+                        </p>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Status:</h6>
+                        <span
+                            class="badge <%= submission.status === 'reviewed' ? 'bg-success' : submission.status === 'evaluated' ? 'bg-warning' : 'bg-secondary' %>">
+                            <%= submission.status.charAt(0).toUpperCase() + submission.status.slice(1) %>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instructor Evaluation -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Instructor Evaluation</h5>
+                </div>
+                <div class="card-body">
+                    <% if (submission.adminScore !==null) { %>
+                        <div class="mb-3">
+                            <h6>Score:</h6>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" role="progressbar"
+                                    style="width: <%= submission.adminScore * 10 %>%"
+                                    aria-valuenow="<%= submission.adminScore %>" aria-valuemin="0" aria-valuemax="10">
+                                    <%= submission.adminScore %>/10
+                                </div>
+                            </div>
+                        </div>
+                        <% } else { %>
+                            <div class="mb-3">
+                                <h6>Score:</h6>
+                                <p class="text-muted">Not yet evaluated</p>
+                            </div>
+                            <% } %>
+
+                                <div class="mb-3">
+                                    <h6>Feedback:</h6>
+                                    <div class="border rounded p-3 bg-light">
+                                        <% if (submission.adminComments) { %>
+                                            <%= submission.adminComments %>
+                                                <% } else { %>
+                                                    <span class="text-muted">No feedback provided yet</span>
+                                                    <% } %>
+                                    </div>
+                                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

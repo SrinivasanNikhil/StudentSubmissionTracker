@@ -1,0 +1,19 @@
+{
+	"title": "JetBlue Data Model",
+	"type": "data model",
+	"details": [
+		{
+			"scenario": "JetBlue Airlines wants to track: scheduled flights, passenger details, baggage details, crew details and aircraft details. It would also like to track the relationships between these entities.",
+			"Tasks": [
+				"Use ChatGPT or another AI tool to generate an initial draft of a data model.",
+				"Review and refine the AI’s suggestion: Normalize the schema if needed, Define appropriate data types and constraints, Add relationships and foreign keys",
+				"Create your final ER diagram in MySQL Workbench or another modeling tool."
+			],
+			"Outputs": [
+				"PNG file of the ER diagram.",
+				"Written explanation of enhancements made to the AI-generated model.",
+				"Students reflection on the process and their learning."
+			]
+		}
+	]
+}

@@ -1,0 +1,52 @@
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center">
+        <div class="jumbotron my-5">
+            <h1 class="display-4">Welcome to SQL Practice</h1>
+            <p class="lead">Improve your SQL skills with interactive practice questions</p>
+            <hr class="my-4">
+            <p>This platform helps university students practice SQL queries through a variety of topics and questions.
+            </p>
+
+            <% if (!locals.isAuthenticated) { %>
+                <div class="mt-4">
+                    <a href="/register" class="btn btn-primary btn-lg me-2">Register</a>
+                    <a href="/login" class="btn btn-outline-secondary btn-lg">Login</a>
+                </div>
+                <% } else { %>
+                    <div class="mt-4">
+                        <a href="/topics" class="btn btn-primary btn-lg">Start Practicing</a>
+                    </div>
+                    <% } %>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Structured Learning</h5>
+                        <p class="card-text">Practice SQL questions organized by topics, from basic SELECT statements to
+                            complex joins and subqueries.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Track Your Progress</h5>
+                        <p class="card-text">Keep track of which questions you've completed and see your improvement
+                            over time.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">University Focused</h5>
+                        <p class="card-text">Designed specifically for university students to supplement their database
+                            coursework.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

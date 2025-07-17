@@ -1,0 +1,57 @@
+{
+	"title": "LEFT and RIGHT Joins",
+	"type": "sql",
+	"database": "ClassicModels",
+	"questions": [
+		{
+			"number": 1,
+			"text": "List all customers along with their orders, including those who have not placed any orders.",
+			"solution_query": "SELECT Customers.customerNumber, customerName, orderNumber, orderDate FROM Customers LEFT JOIN Orders ON Customers.customerNumber = Orders.customerNumber"
+		},
+		{
+			"number": 2,
+			"text": "List all orders and their corresponding customers, ensuring orders without customers (if any) are also displayed.",
+			"solution_query": "SELECT orderNumber, orderDate, customerName FROM Orders RIGHT JOIN Customers ON Orders.customerNumber = Customers.customerNumber"
+		},
+		{
+			"number": 3,
+			"text": "Retrieve all employees and their associated offices, including those employees who may not be assigned to any office.",
+			"solution_query": "SELECT employeeNumber, firstName, lastName, city FROM Employees LEFT JOIN Offices ON Employees.officeCode = Offices.officeCode"
+		},
+		{
+			"number": 4,
+			"text": "Find all customers along with their payments, ensuring customers without payments are included.",
+			"solution_query": "SELECT Customers.customerNumber, customerName, paymentDate, amount FROM Customers LEFT JOIN Payments ON Customers.customerNumber = Payments.customerNumber"
+		},
+		{
+			"number": 5,
+			"text": "List all products along with the total quantity ordered, including products that have never been ordered.",
+			"solution_query": "SELECT Products.productCode, productName, COALESCE(SUM(quantityOrdered), 0) AS totalQuantity FROM Products LEFT JOIN OrderDetails ON Products.productCode = OrderDetails.productCode GROUP BY productCode"
+		},
+		{
+			"number": 6,
+			"text": "Show all employees who are Sales Reps and the customers they manage, ensuring that employees without customers are listed too.",
+			"solution_query": "SELECT employeeNumber, firstName, lastName, customerName FROM Employees LEFT JOIN Customers ON Employees.employeeNumber = Customers.salesRepEmployeeNumber WHERE jobTitle = 'Sales Rep'"
+		},
+		{
+			"number": 7,
+			"text": "List all orders along with the product names and quantities ordered, including orders that may not have product details.",
+			"solution_query": "SELECT Orders.orderNumber, orderDate, productName, quantityOrdered FROM Orders LEFT JOIN OrderDetails ON Orders.orderNumber = OrderDetails.orderNumber LEFT JOIN Products ON OrderDetails.productCode = Products.productCode"
+		},
+		{
+			"number": 8,
+			"text": "Retrieve all products along with their corresponding product lines, ensuring that all product lines are listed, even those without products.",
+			"solution_query": "SELECT Products.productLine, productCode, productName FROM ProductLines LEFT JOIN Products ON ProductLines.productLine = Products.productLine"
+		},
+		{
+			"number": 9,
+			"text": "List customers and the total amount they have spent, including customers who have not made any purchases.",
+			"solution_query": "SELECT Customers.customerNumber, customerName, COALESCE(SUM(amount), 0) AS totalSpent FROM Customers LEFT JOIN Payments ON Customers.customerNumber = Payments.customerNumber GROUP BY customerNumber"
+		},
+		{
+			"number": 10,
+			"text": "Find employees along with their managers, ensuring that all employees are listed, even those without managers.",
+			"solution_query": "SELECT Employees.employeeNumber, Employees.firstName, Employees.lastName, Managers.firstName AS managerFirstName, Managers.lastName AS managerLastName FROM Employees LEFT JOIN Employees AS Managers ON Employees.reportsTo = Managers.employeeNumber"
+		}
+	]
+}

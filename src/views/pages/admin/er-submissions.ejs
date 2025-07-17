@@ -1,0 +1,97 @@
+<div class="container mt-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/admin">Admin Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">ER Diagram Submissions</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-diagram-3 me-2"></i>
+            ER Diagram Submissions
+        </h2>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Question</th>
+                            <th>Submitted</th>
+                            <th>AI Score</th>
+                            <th>Admin Score</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% submissions.forEach(submission=> { %>
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="ms-2">
+                                            <div class="fw-bold">
+                                                <%= submission.user ? submission.user.firstName : '' %>
+                                                    <%= submission.user ? submission.user.lastName : '' %>
+                                            </div>
+                                            <div class="text-muted small">
+                                                <%= submission.user ? submission.user.email : '' %>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 200px;">
+                                        <%= submission.question ? submission.question.questionText : '' %>
+                                    </div>
+                                </td>
+                                <td>
+                                    <%= new Date(submission.completedAt).toLocaleDateString() %>
+                                        <div class="text-muted small">
+                                            <%= new Date(submission.completedAt).toLocaleTimeString() %>
+                                        </div>
+                                </td>
+                                <td>
+                                    <% if (submission.aiScore !==null) { %>
+                                        <span class="badge bg-info">
+                                            <%= submission.aiScore %>/10
+                                        </span>
+                                        <% } else { %>
+                                            <span class="badge bg-secondary">Pending</span>
+                                            <% } %>
+                                </td>
+                                <td>
+                                    <% if (submission.adminScore !==null) { %>
+                                        <span class="badge bg-primary">
+                                            <%= submission.adminScore %>/10
+                                        </span>
+                                        <% } else { %>
+                                            <span class="badge bg-secondary">Not Reviewed</span>
+                                            <% } %>
+                                </td>
+                                <td>
+                                    <% if (submission.adminScore !==null) { %>
+                                        <span class="badge bg-success">Reviewed</span>
+                                        <% } else { %>
+                                            <span class="badge bg-warning">Pending Review</span>
+                                            <% } %>
+                                </td>
+                                <td>
+                                    <a href="/er-diagrams/admin/submissions/<%= submission.id %>"
+                                        class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye me-1"></i>
+                                        Review
+                                    </a>
+                                </td>
+                            </tr>
+                            <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
