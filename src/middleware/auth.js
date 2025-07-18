@@ -16,7 +16,12 @@ const isAuthenticated = (req, res, next) => {
 // Used for login/register pages to redirect already logged in users
 const isNotAuthenticated = (req, res, next) => {
 	if (req.session && req.session.userId) {
-		return res.redirect("/dashboard");
+		// Redirect admin users to admin dashboard, regular users to topics page
+		if (req.session.user && req.session.user.isAdmin) {
+			return res.redirect("/admin");
+		} else {
+			return res.redirect("/topics");
+		}
 	}
 
 	return next();
