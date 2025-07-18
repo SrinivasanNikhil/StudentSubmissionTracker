@@ -16,3 +16,4 @@ setup-ssl.sh
 ssl-setup-manual.md
 session-fix.js
 fix-sessions.sh
+test-password-validation.js

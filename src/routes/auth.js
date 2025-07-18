@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require("bcrypt");
 const { User } = require("../models");
 const { isAuthenticated, isNotAuthenticated } = require("../middleware/auth");
+const { validatePassword } = require("../utils/passwordValidator");
 
 // Display login form
 router.get("/login", isNotAuthenticated, (req, res) => {
@@ -117,6 +118,19 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 			return res.render("pages/register", {
 				title: "Register",
 				error: "Passwords do not match",
+				email,
+				firstName,
+				lastName,
+				code,
+			});
+		}
+
+		// Validate password strength
+		const passwordValidation = validatePassword(password);
+		if (!passwordValidation.isValid) {
+			return res.render("pages/register", {
+				title: "Register",
+				error: passwordValidation.errors.join(". "),
 				email,
 				firstName,
 				lastName,

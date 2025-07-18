@@ -34,12 +34,27 @@
                         <label for="password" class="form-label">Password</label>
                         <input type="password" class="form-control" id="password" name="password" required
                             minlength="8">
-                        <div class="form-text">Password must be at least 8 characters long.</div>
+                        <div class="form-text">
+                            <strong>Password Requirements:</strong>
+                            <ul class="mt-2 mb-0">
+                                <li>At least 8 characters long</li>
+                                <li>At least one uppercase letter (A-Z)</li>
+                                <li>At least one lowercase letter (a-z)</li>
+                                <li>At least one number (0-9)</li>
+                                <li>At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)</li>
+                                <li>Cannot be a common password</li>
+                                <li>Cannot contain sequential characters (e.g., abc, 123)</li>
+                                <li>Cannot contain repeating characters (e.g., aaa, 111)</li>
+                            </ul>
+                        </div>
+                        <div id="password-strength" class="mt-2"></div>
+                        <div id="password-requirements" class="mt-2"></div>
                     </div>
                     <div class="mb-3">
                         <label for="confirmPassword" class="form-label">Confirm Password</label>
                         <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required
                             minlength="8">
+                        <div id="password-match" class="mt-2"></div>
                     </div>
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary">Register</button>
@@ -52,3 +67,208 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        const passwordStrength = document.getElementById('password-strength');
+        const passwordRequirements = document.getElementById('password-requirements');
+        const passwordMatch = document.getElementById('password-match');
+        const submitButton = document.querySelector('button[type="submit"]');
+
+        // Password validation function
+        function validatePassword(password) {
+            const errors = [];
+            const requirements = {
+                length: password.length >= 8,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /\d/.test(password),
+                special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password),
+                common: !isCommonPassword(password),
+                sequential: !hasSequentialChars(password),
+                repeating: !hasRepeatingChars(password)
+            };
+
+            if (!requirements.length) errors.push('At least 8 characters long');
+            if (!requirements.uppercase) errors.push('At least one uppercase letter (A-Z)');
+            if (!requirements.lowercase) errors.push('At least one lowercase letter (a-z)');
+            if (!requirements.number) errors.push('At least one number (0-9)');
+            if (!requirements.special) errors.push('At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)');
+            if (!requirements.common) errors.push('Cannot be a common password');
+            if (!requirements.sequential) errors.push('Cannot contain sequential characters (e.g., abc, 123)');
+            if (!requirements.repeating) errors.push('Cannot contain repeating characters (e.g., aaa, 111)');
+
+            return { isValid: errors.length === 0, errors, requirements };
+        }
+
+        // Check for common passwords
+        function isCommonPassword(password) {
+            const commonPasswords = [
+                'password', '123456', '123456789', 'qwerty', 'abc123', 'password123',
+                'admin', 'letmein', 'welcome', 'monkey', 'dragon', 'master', 'hello',
+                'freedom', 'whatever', 'qazwsx', 'trustno1', 'jordan', 'harley',
+                'ranger', 'iwantu', 'jennifer', 'hunter', 'buster', 'soccer',
+                'baseball', 'tiger', 'charlie', 'andrew', 'michelle', 'love',
+                'sunshine', 'jessica', 'asshole', '696969', 'amanda', 'access',
+                'yankees', '987654321', 'dallas', 'austin', 'thunder', 'taylor',
+                'matrix', 'mobilemail', 'mom', 'monitor', 'monitoring', 'montana',
+                'moon', 'moscow', 'mother', 'movie', 'mozilla', 'music', 'mustang',
+                'password', 'pa$$w0rd', 'p@ssw0rd', 'pass123', 'pass1234', 'pass12345',
+                'admin123', 'root123', 'user123', 'test123', 'demo123', 'guest123',
+                'welcome123', 'login123', 'signup123', 'register123', 'account123',
+                'secure123', 'safe123', 'protect123', 'guard123', 'shield123',
+                'defend123', 'secure123', 'safety123', 'guardian123', 'keeper123'
+            ];
+
+            return commonPasswords.includes(password.toLowerCase());
+        }
+
+        // Check for sequential characters
+        function hasSequentialChars(password) {
+            const sequences = [
+                'abcdefghijklmnopqrstuvwxyz',
+                'zyxwvutsrqponmlkjihgfedcba',
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                'ZYXWVUTSRQPONMLKJIHGFEDCBA',
+                '0123456789',
+                '9876543210',
+                'qwertyuiop',
+                'poiuytrewq',
+                'asdfghjkl',
+                'lkjhgfdsa',
+                'zxcvbnm',
+                'mnbvcxz'
+            ];
+
+            for (const seq of sequences) {
+                for (let i = 0; i <= seq.length - 3; i++) {
+                    const sequence = seq.substring(i, i + 3);
+                    if (password.toLowerCase().includes(sequence)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // Check for repeating characters
+        function hasRepeatingChars(password) {
+            for (let i = 0; i < password.length - 2; i++) {
+                if (password[i] === password[i + 1] && password[i] === password[i + 2]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Calculate password strength
+        function calculateStrength(password) {
+            if (!password) return 'invalid';
+
+            let score = 0;
+
+            // Length contribution (up to 25 points)
+            score += Math.min(25, password.length * 2);
+
+            // Character variety contribution (up to 25 points)
+            let variety = 0;
+            if (/[a-z]/.test(password)) variety++;
+            if (/[A-Z]/.test(password)) variety++;
+            if (/\d/.test(password)) variety++;
+            if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) variety++;
+            score += variety * 6.25;
+
+            // Complexity contribution (up to 25 points)
+            const uniqueChars = new Set(password).size;
+            score += Math.min(25, uniqueChars * 2);
+
+            // Penalties
+            if (isCommonPassword(password)) score -= 30;
+            if (hasSequentialChars(password)) score -= 20;
+            if (hasRepeatingChars(password)) score -= 15;
+
+            score = Math.max(0, Math.min(100, score));
+
+            if (score < 20) return 'weak';
+            if (score < 40) return 'fair';
+            if (score < 60) return 'good';
+            if (score < 80) return 'strong';
+            return 'very-strong';
+        }
+
+        // Update password strength display
+        function updatePasswordStrength() {
+            const password = passwordInput.value;
+            const strength = calculateStrength(password);
+            const validation = validatePassword(password);
+
+            // Update strength indicator
+            const strengthColors = {
+                'invalid': 'text-muted',
+                'weak': 'text-danger',
+                'fair': 'text-warning',
+                'good': 'text-info',
+                'strong': 'text-primary',
+                'very-strong': 'text-success'
+            };
+
+            const strengthTexts = {
+                'invalid': 'Enter a password',
+                'weak': 'Weak password',
+                'fair': 'Fair password',
+                'good': 'Good password',
+                'strong': 'Strong password',
+                'very-strong': 'Very strong password'
+            };
+
+            passwordStrength.innerHTML = `<small class="${strengthColors[strength]}">${strengthTexts[strength]}</small>`;
+
+            // Update requirements display
+            if (password) {
+                const reqList = validation.errors.map(error => `<li class="text-danger">${error}</li>`).join('');
+                passwordRequirements.innerHTML = reqList ? `<ul class="list-unstyled small">${reqList}</ul>` : '';
+            } else {
+                passwordRequirements.innerHTML = '';
+            }
+
+            updateSubmitButton();
+        }
+
+        // Update password match display
+        function updatePasswordMatch() {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+
+            if (!confirmPassword) {
+                passwordMatch.innerHTML = '';
+            } else if (password === confirmPassword) {
+                passwordMatch.innerHTML = '<small class="text-success">Passwords match</small>';
+            } else {
+                passwordMatch.innerHTML = '<small class="text-danger">Passwords do not match</small>';
+            }
+
+            updateSubmitButton();
+        }
+
+        // Update submit button state
+        function updateSubmitButton() {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            const validation = validatePassword(password);
+
+            const isValid = validation.isValid && password === confirmPassword && password.length > 0;
+            submitButton.disabled = !isValid;
+        }
+
+        // Event listeners
+        passwordInput.addEventListener('input', updatePasswordStrength);
+        confirmPasswordInput.addEventListener('input', updatePasswordMatch);
+
+        // Initial state
+        updatePasswordStrength();
+        updatePasswordMatch();
+    });
+</script>
