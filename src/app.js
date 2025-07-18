@@ -43,6 +43,14 @@ const sessionStore = new SequelizeStore({
 	createTableIfMissing: true,
 });
 
+// Trust proxy configuration for production
+if (
+	process.env.TRUST_PROXY === "true" ||
+	process.env.NODE_ENV === "production"
+) {
+	app.set("trust proxy", 1);
+}
+
 // Session configuration
 app.use(
 	session({
@@ -53,7 +61,8 @@ app.use(
 		rolling: true,
 		cookie: {
 			httpOnly: true,
-			secure: process.env.NODE_ENV === "production",
+			secure:
+				process.env.NODE_ENV === "production" && process.env.HTTPS === "on",
 			maxAge: 1000 * 60 * 60 * 24, // 1 day
 			sameSite: "lax",
 			path: "/",
