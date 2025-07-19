@@ -1,183 +1,179 @@
-<%- include('../partials/header') %>
+<div class="container mt-4">
+    <h1 class="mb-4">Your Progress</h1>
 
-    <div class="container mt-4">
-        <h1 class="mb-4">Your Progress</h1>
-
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">SQL Questions Progress</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="progress mb-3">
-                            <div class="progress-bar" role="progressbar" style="width: <%= sqlProgress %>%;"
-                                aria-valuenow="<%= sqlProgress %>" aria-valuemin="0" aria-valuemax="100">
-                                <%= sqlProgress %>%
-                            </div>
-                        </div>
-                        <p class="card-text">
-                            <strong>Completed:</strong>
-                            <%= sqlCompleted %> of <%= sqlTotal %> questions
-                        </p>
-                    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">SQL Questions Progress</h5>
                 </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Data Model Questions Progress</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="progress mb-3">
-                            <div class="progress-bar" role="progressbar" style="width: <%= dataModelProgress %>%;"
-                                aria-valuenow="<%= dataModelProgress %>" aria-valuemin="0" aria-valuemax="100">
-                                <%= dataModelProgress %>%
-                            </div>
+                <div class="card-body">
+                    <div class="progress mb-3">
+                        <div class="progress-bar" role="progressbar" style="width: <%= sqlProgress %>%;"
+                            aria-valuenow="<%= sqlProgress %>" aria-valuemin="0" aria-valuemax="100">
+                            <%= sqlProgress %>%
                         </div>
-                        <p class="card-text">
-                            <strong>Completed:</strong>
-                            <%= dataModelCompleted %> of <%= dataModelTotal %> questions
-                        </p>
                     </div>
+                    <p class="card-text">
+                        <strong>Completed:</strong>
+                        <%= sqlCompleted %> of <%= sqlTotal %> questions
+                    </p>
                 </div>
             </div>
         </div>
 
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Recent Completions</h5>
-            </div>
-            <div class="card-body">
-                <% if (recentCompletions.length> 0) { %>
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Question</th>
-                                    <th>Topic</th>
-                                    <th>Completed At</th>
-                                    <th>Score</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <% recentCompletions.forEach(completion=> { %>
-                                    <tr>
-                                        <td>
-                                            <%= completion.Question.questionText %>
-                                        </td>
-                                        <td>
-                                            <%= completion.Question.Topic.name %>
-                                        </td>
-                                        <td>
-                                            <%= new Date(completion.completedAt).toLocaleString() %>
-                                        </td>
-                                        <td>
-                                            <% if (completion.evaluation) { %>
-                                                <% try { %>
-                                                    <% const evaluation=JSON.parse(completion.evaluation); %>
-                                                        <%= evaluation.score || 'N/A' %>
-                                                            <% } catch (e) { %>
-                                                                N/A
-                                                                <% } %>
-                                                                    <% } else { %>
-                                                                        N/A
-                                                                        <% } %>
-                                        </td>
-                                    </tr>
-                                    <% }); %>
-                            </tbody>
-                        </table>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Data Model Questions Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3">
+                        <div class="progress-bar" role="progressbar" style="width: <%= dataModelProgress %>%;"
+                            aria-valuenow="<%= dataModelProgress %>" aria-valuemin="0" aria-valuemax="100">
+                            <%= dataModelProgress %>%
+                        </div>
                     </div>
-                    <% } else { %>
-                        <p class="text-muted">No completions yet. Start working on some questions!</p>
-                        <% } %>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Topic-wise Progress</h5>
-            </div>
-            <div class="card-body">
-                <% if (topicProgress.length> 0) { %>
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Topic</th>
-                                    <th>Type</th>
-                                    <th>Progress</th>
-                                    <th>Completed</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <% topicProgress.forEach(topic=> { %>
-                                    <tr>
-                                        <td>
-                                            <%= topic.name %>
-                                        </td>
-                                        <td>
-                                            <%= topic.type==='sql' ? 'SQL' : 'Data Model' %>
-                                        </td>
-                                        <td>
-                                            <div class="progress">
-                                                <div class="progress-bar" role="progressbar"
-                                                    style="width: <%= topic.progress %>%;"
-                                                    aria-valuenow="<%= topic.progress %>" aria-valuemin="0"
-                                                    aria-valuemax="100">
-                                                    <%= topic.progress %>%
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <%= topic.completed %> of <%= topic.total %>
-                                        </td>
-                                    </tr>
-                                    <% }); %>
-                            </tbody>
-                        </table>
-                    </div>
-                    <% } else { %>
-                        <p class="text-muted">No topics available.</p>
-                        <% } %>
+                    <p class="card-text">
+                        <strong>Completed:</strong>
+                        <%= dataModelCompleted %> of <%= dataModelTotal %> questions
+                    </p>
+                </div>
             </div>
         </div>
     </div>
 
-    <script>
-        // Function to fetch completion data for a specific question
-        async function fetchCompletionData(questionId) {
-            try {
-                const response = await fetch(`/questions/${questionId}/completion`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.message || 'Failed to fetch completion data');
-                }
-                return data.evaluation;
-            } catch (error) {
-                console.error('Error fetching completion data:', error);
-                return null;
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Recent Completions</h5>
+        </div>
+        <div class="card-body">
+            <% if (recentCompletions.length> 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Question</th>
+                                <th>Topic</th>
+                                <th>Completed At</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% recentCompletions.forEach(completion=> { %>
+                                <tr>
+                                    <td>
+                                        <%= completion.Question.questionText %>
+                                    </td>
+                                    <td>
+                                        <%= completion.Question.Topic.name %>
+                                    </td>
+                                    <td>
+                                        <%= new Date(completion.completedAt).toLocaleString() %>
+                                    </td>
+                                    <td>
+                                        <% if (completion.evaluation) { %>
+                                            <% try { %>
+                                                <% const evaluation=JSON.parse(completion.evaluation); %>
+                                                    <%= evaluation.score || 'N/A' %>
+                                                        <% } catch (e) { %>
+                                                            N/A
+                                                            <% } %>
+                                                                <% } else { %>
+                                                                    N/A
+                                                                    <% } %>
+                                    </td>
+                                </tr>
+                                <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } else { %>
+                    <p class="text-muted">No completions yet. Start working on some questions!</p>
+                    <% } %>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Topic-wise Progress</h5>
+        </div>
+        <div class="card-body">
+            <% if (topicProgress.length> 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Topic</th>
+                                <th>Type</th>
+                                <th>Progress</th>
+                                <th>Completed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% topicProgress.forEach(topic=> { %>
+                                <tr>
+                                    <td>
+                                        <%= topic.name %>
+                                    </td>
+                                    <td>
+                                        <%= topic.type==='sql' ? 'SQL' : 'Data Model' %>
+                                    </td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar" role="progressbar"
+                                                style="width: <%= topic.progress %>%;"
+                                                aria-valuenow="<%= topic.progress %>" aria-valuemin="0"
+                                                aria-valuemax="100">
+                                                <%= topic.progress %>%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <%= topic.completed %> of <%= topic.total %>
+                                    </td>
+                                </tr>
+                                <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } else { %>
+                    <p class="text-muted">No topics available.</p>
+                    <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Function to fetch completion data for a specific question
+    async function fetchCompletionData(questionId) {
+        try {
+            const response = await fetch(`/questions/${questionId}/completion`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to fetch completion data');
+            }
+            return data.evaluation;
+        } catch (error) {
+            console.error('Error fetching completion data:', error);
+            return null;
         }
+    }
 
-        // Function to update the progress bars
-        function updateProgressBars() {
-            const progressBars = document.querySelectorAll('.progress-bar');
-            progressBars.forEach(bar => {
-                const value = bar.getAttribute('aria-valuenow');
-                bar.style.width = `${value}%`;
-            });
-        }
-
-        // Initialize progress bars when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            updateProgressBars();
+    // Function to update the progress bars
+    function updateProgressBars() {
+        const progressBars = document.querySelectorAll('.progress-bar');
+        progressBars.forEach(bar => {
+            const value = bar.getAttribute('aria-valuenow');
+            bar.style.width = `${value}%`;
         });
-    </script>
+    }
 
-    <%- include('../partials/footer') %>
+    // Initialize progress bars when the page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        updateProgressBars();
+    });
+</script>
