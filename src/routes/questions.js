@@ -311,7 +311,7 @@ router.post("/:id/analyze-realtime", isAuthenticated, async (req, res) => {
 		}
 
 		// Create a prompt for ChatGPT
-		const prompt = `You are an SQL tutor helping a student write a query for the following question:
+		const prompt = `You are an MySQL tutor helping a student write a query for the following question:
 
 Question: ${question.questionText}
 
@@ -332,7 +332,7 @@ Format the response in HTML with appropriate styling.`;
 				{
 					role: "system",
 					content:
-						"You are an expert SQL tutor providing real-time feedback to students.",
+						"You are an expert MySQL tutor providing real-time feedback to students.",
 				},
 				{
 					role: "user",

@@ -205,13 +205,180 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 	}
 });
 
+// Request password reset
+router.get("/forgot-password", isNotAuthenticated, (req, res) => {
+	res.render("pages/forgot-password", {
+		title: "Forgot Password",
+		error: null,
+		success: null,
+	});
+});
+
+router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
+	try {
+		const { email } = req.body;
+
+		// Validate email
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(email)) {
+			return res.render("pages/forgot-password", {
+				title: "Forgot Password",
+				error: "Please enter a valid email address",
+				success: null,
+			});
+		}
+
+		// Find user
+		const user = await User.findOne({ where: { email } });
+
+		if (user) {
+			// Generate reset token
+			const resetToken = await User.createPasswordReset(user);
+
+			// Send email
+			const emailService = require("../utils/emailService");
+			const emailSent = await emailService.sendPasswordResetEmail(
+				email,
+				resetToken,
+				user.firstName || user.email
+			);
+
+			if (emailSent) {
+				return res.render("pages/forgot-password", {
+					title: "Forgot Password",
+					error: null,
+					success:
+						"If an account with that email exists, a password reset link has been sent.",
+				});
+			} else {
+				return res.render("pages/forgot-password", {
+					title: "Forgot Password",
+					error: "Failed to send reset email. Please try again later.",
+					success: null,
+				});
+			}
+		} else {
+			// Don't reveal if user exists or not (security best practice)
+			return res.render("pages/forgot-password", {
+				title: "Forgot Password",
+				error: null,
+				success:
+					"If an account with that email exists, a password reset link has been sent.",
+			});
+		}
+	} catch (error) {
+		console.error("Password reset request error:", error);
+		return res.render("pages/forgot-password", {
+			title: "Forgot Password",
+			error: "An error occurred. Please try again later.",
+			success: null,
+		});
+	}
+});
+
+// Reset password with token
+router.get("/reset-password/:token", isNotAuthenticated, async (req, res) => {
+	try {
+		const { token } = req.params;
+
+		// Validate token
+		const user = await User.validateResetToken(token);
+
+		if (!user) {
+			return res.render("pages/error", {
+				title: "Invalid Reset Link",
+				message:
+					"This password reset link is invalid or has expired. Please request a new one.",
+			});
+		}
+
+		res.render("pages/reset-password", {
+			title: "Reset Password",
+			token,
+			error: null,
+		});
+	} catch (error) {
+		console.error("Reset password error:", error);
+		res.render("pages/error", {
+			title: "Error",
+			message: "An error occurred. Please try again later.",
+		});
+	}
+});
+
+router.post("/reset-password/:token", isNotAuthenticated, async (req, res) => {
+	try {
+		const { token } = req.params;
+		const { password, confirmPassword } = req.body;
+
+		// Validate token
+		const user = await User.validateResetToken(token);
+
+		if (!user) {
+			return res.render("pages/error", {
+				title: "Invalid Reset Link",
+				message:
+					"This password reset link is invalid or has expired. Please request a new one.",
+			});
+		}
+
+		// Validate passwords
+		if (!password || !confirmPassword) {
+			return res.render("pages/reset-password", {
+				title: "Reset Password",
+				token,
+				error: "Both password fields are required.",
+			});
+		}
+
+		if (password !== confirmPassword) {
+			return res.render("pages/reset-password", {
+				title: "Reset Password",
+				token,
+				error: "Passwords do not match.",
+			});
+		}
+
+		// Validate password strength
+		const passwordValidation = validatePassword(password);
+		if (!passwordValidation.isValid) {
+			return res.render("pages/reset-password", {
+				title: "Reset Password",
+				token,
+				error: passwordValidation.errors.join(". "),
+			});
+		}
+
+		// Update password and invalidate token
+		const passwordHash = await bcrypt.hash(password, 10);
+		await user.update({
+			passwordHash,
+			resetTokenUsed: true,
+		});
+
+		// Redirect to login with success message
+		req.flash(
+			"success",
+			"Password has been reset successfully. Please log in with your new password."
+		);
+		res.redirect("/auth/login");
+	} catch (error) {
+		console.error("Password reset error:", error);
+		res.render("pages/reset-password", {
+			title: "Reset Password",
+			token: req.params.token,
+			error: "An error occurred. Please try again later.",
+		});
+	}
+});
+
 // Logout
 router.get("/logout", isAuthenticated, (req, res) => {
 	req.session.destroy((err) => {
 		if (err) {
 			console.error("Error destroying session:", err);
 		}
-		res.redirect("/login");
+		res.redirect("/auth/login");
 	});
 });
 

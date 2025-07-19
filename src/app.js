@@ -132,13 +132,33 @@ const adminRoutes = require("./routes/admin");
 const erDiagramRoutes = require("./routes/er-diagrams");
 
 // Register routes
-app.use("/", authRoutes);
+app.use("/auth", authRoutes);
 app.use("/topics", topicRoutes);
 app.use("/questions", questionRoutes);
 app.use("/completions", completionRoutes);
 app.use("/profile", profileRoutes);
 app.use("/admin", adminRoutes);
 app.use("/er-diagrams", erDiagramRoutes);
+
+// Root-level auth routes (for backward compatibility and direct access)
+const { isAuthenticated, isNotAuthenticated } = require("./middleware/auth");
+
+// Redirect root auth routes to /auth paths
+app.get("/login", isNotAuthenticated, (req, res) => {
+	res.redirect("/auth/login");
+});
+
+app.get("/register", isNotAuthenticated, (req, res) => {
+	res.redirect("/auth/register");
+});
+
+app.get("/forgot-password", isNotAuthenticated, (req, res) => {
+	res.redirect("/auth/forgot-password");
+});
+
+app.get("/logout", isAuthenticated, (req, res) => {
+	res.redirect("/auth/logout");
+});
 
 // Home route
 app.get("/", (req, res) => {
