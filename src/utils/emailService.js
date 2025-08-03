@@ -45,11 +45,22 @@ class EmailService {
 			`,
 		};
 
+		console.log(
+			`[EmailService] Attempting to send password reset email to: ${email}`
+		);
+		console.log(`[EmailService] Reset URL: ${resetUrl}`);
+
 		try {
-			await this.transporter.sendMail(mailOptions);
+			const result = await this.transporter.sendMail(mailOptions);
+			console.log(`[EmailService] Email sent successfully to ${email}`);
+			console.log(`[EmailService] Message ID: ${result.messageId}`);
+			console.log(`[EmailService] Accepted: ${result.accepted.join(", ")}`);
+			if (result.rejected.length > 0) {
+				console.log(`[EmailService] Rejected: ${result.rejected.join(", ")}`);
+			}
 			return true;
 		} catch (error) {
-			console.error("Email sending error:", error);
+			console.error(`[EmailService] Email sending error for ${email}:`, error);
 			return false;
 		}
 	}

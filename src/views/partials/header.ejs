@@ -27,7 +27,7 @@
             </ul>
             <ul class="navbar-nav">
                 <% if (locals.user) { %>
-                    <% if (locals.user.isAdmin===true) { %>
+                    <% if (locals.user.isAdmin===true || locals.user.role==='admin' ) { %>
                         <!-- Admin Navigation -->
                         <li class="nav-item">
                             <a class="nav-link" href="/admin" title="Admin Dashboard">
@@ -37,6 +37,11 @@
                         <li class="nav-item">
                             <a class="nav-link" href="/admin/users" title="User Management">
                                 <i class="bi bi-people me-1"></i>Users
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/instructors" title="Instructor Management">
+                                <i class="bi bi-person-workspace me-1"></i>Instructors
                             </a>
                         </li>
                         <li class="nav-item">
@@ -55,27 +60,55 @@
                                 <i class="bi bi-box-arrow-right me-1"></i>Logout
                             </a>
                         </li>
-                        <% } else { %>
-                            <!-- Regular User Navigation -->
+                        <% } else if (locals.user.role==='instructor' ) { %>
+                            <!-- Instructor Navigation -->
                             <li class="nav-item">
-                                <a class="nav-link" href="/profile">
-                                    <%= locals.user.firstName %>
-                                        <%= locals.user.lastName %>
+                                <a class="nav-link" href="/instructor/dashboard" title="Instructor Dashboard">
+                                    <i class="bi bi-speedometer2 me-1"></i>Dashboard
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="/auth/logout">Logout</a>
+                                <a class="nav-link" href="/instructor/students" title="My Students">
+                                    <i class="bi bi-people me-1"></i>Students
+                                </a>
                             </li>
-                            <% } %>
-                                <% } else { %>
-                                    <!-- Guest Navigation -->
-                                    <li class="nav-item">
-                                        <a class="nav-link" href="/auth/login">Login</a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a class="nav-link" href="/auth/register">Register</a>
-                                    </li>
-                                    <% } %>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/instructor/submissions" title="ER Diagram Submissions">
+                                    <i class="bi bi-diagram-3 me-1"></i>Submissions
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/profile" title="Profile">
+                                    <i class="bi bi-person me-1"></i>
+                                    <%= locals.user.firstName %>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/auth/logout" title="Logout">
+                                    <i class="bi bi-box-arrow-right me-1"></i>Logout
+                                </a>
+                            </li>
+                            <% } else { %>
+                                <!-- Student Navigation -->
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/profile">
+                                        <%= locals.user.firstName %>
+                                            <%= locals.user.lastName %>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/auth/logout">Logout</a>
+                                </li>
+                                <% } %>
+                                    <% } else { %>
+                                        <!-- Guest Navigation -->
+                                        <li class="nav-item">
+                                            <a class="nav-link" href="/auth/login">Login</a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link" href="/auth/register">Register</a>
+                                        </li>
+                                        <% } %>
             </ul>
         </div>
     </div>

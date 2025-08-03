@@ -4,7 +4,11 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs").promises;
 const { Completion, Question, User, Topic } = require("../models");
-const { isAuthenticated, isAdmin } = require("../middleware/auth");
+const {
+	isAuthenticated,
+	isAdmin,
+	isInstructorOrAdmin,
+} = require("../middleware/auth");
 const { OpenAI } = require("openai");
 const { Op } = require("sequelize");
 
@@ -163,7 +167,7 @@ router.post(
 				userId,
 				questionId,
 				completedAt: new Date(),
-				diagramImage: `/uploads/diagrams/${req.file.filename}`,
+				diagramImage: `/diagrams/${req.file.filename}`,
 				enhancements,
 				aiReflection,
 				status: "pending",
@@ -199,15 +203,33 @@ router.post(
 	}
 );
 
-// Admin: Get all ER diagram submissions
-router.get("/admin/submissions", isAdmin, async (req, res) => {
+// Admin/Instructor: Get all ER diagram submissions (filtered for instructors)
+router.get("/admin/submissions", isInstructorOrAdmin, async (req, res) => {
 	try {
-		const submissions = await Completion.findAll({
-			where: {
-				diagramImage: {
-					[Op.not]: null,
-				},
+		let whereCondition = {
+			diagramImage: {
+				[Op.not]: null,
 			},
+		};
+
+		// If instructor, only show submissions from their students
+		if (req.session.user.role === "instructor") {
+			const instructorId = req.session.user.id;
+			const students = await User.findAll({
+				where: {
+					associatedInstructorId: instructorId,
+					role: "student",
+				},
+				attributes: ["id"],
+			});
+			const studentIds = students.map((student) => student.id);
+			whereCondition.userId = {
+				[Op.in]: studentIds,
+			};
+		}
+
+		const submissions = await Completion.findAll({
+			where: whereCondition,
 			include: [
 				{
 					model: User,
@@ -223,7 +245,12 @@ router.get("/admin/submissions", isAdmin, async (req, res) => {
 			order: [["completedAt", "DESC"]],
 		});
 
-		res.render("pages/admin/er-submissions", {
+		const templatePath =
+			req.session.user.role === "instructor"
+				? "pages/instructor/submissions"
+				: "pages/admin/er-submissions";
+
+		res.render(templatePath, {
 			title: "ER Diagram Submissions",
 			submissions,
 		});
@@ -236,15 +263,21 @@ router.get("/admin/submissions", isAdmin, async (req, res) => {
 	}
 });
 
-// Admin: Get single submission details
-router.get("/admin/submissions/:id", isAdmin, async (req, res) => {
+// Admin/Instructor: Get single submission details
+router.get("/admin/submissions/:id", isInstructorOrAdmin, async (req, res) => {
 	try {
 		const submission = await Completion.findByPk(req.params.id, {
 			include: [
 				{
 					model: User,
 					as: "user",
-					attributes: ["id", "email", "firstName", "lastName"],
+					attributes: [
+						"id",
+						"email",
+						"firstName",
+						"lastName",
+						"associatedInstructorId",
+					],
 				},
 				{
 					model: Question,
@@ -259,6 +292,17 @@ router.get("/admin/submissions/:id", isAdmin, async (req, res) => {
 				title: "Not Found",
 				message: "Submission not found",
 			});
+		}
+
+		// If instructor, verify the submission belongs to one of their students
+		if (req.session.user.role === "instructor") {
+			const instructorId = req.session.user.id;
+			if (submission.user.associatedInstructorId !== instructorId) {
+				return res.status(403).render("pages/error", {
+					title: "Access Denied",
+					message: "You can only view submissions from your students.",
+				});
+			}
 		}
 
 		// Process evaluation data for template
@@ -295,7 +339,12 @@ router.get("/admin/submissions/:id", isAdmin, async (req, res) => {
 			}
 		}
 
-		res.render("pages/admin/er-submission-detail", {
+		const templatePath =
+			req.session.user.role === "instructor"
+				? "pages/instructor/submission-detail"
+				: "pages/admin/er-submission-detail";
+
+		res.render(templatePath, {
 			title: "Submission Details",
 			submission,
 			aiFeedback,
@@ -312,17 +361,36 @@ router.get("/admin/submissions/:id", isAdmin, async (req, res) => {
 	}
 });
 
-// Admin: Update submission (comments and score)
-router.post("/admin/submissions/:id", isAdmin, async (req, res) => {
+// Admin/Instructor: Update submission (comments and score)
+router.post("/admin/submissions/:id", isInstructorOrAdmin, async (req, res) => {
 	try {
 		const { adminComments, adminScore } = req.body;
-		const submission = await Completion.findByPk(req.params.id);
+		const submission = await Completion.findByPk(req.params.id, {
+			include: [
+				{
+					model: User,
+					as: "user",
+					attributes: ["id", "associatedInstructorId"],
+				},
+			],
+		});
 
 		if (!submission) {
 			return res.status(404).json({
 				success: false,
 				message: "Submission not found",
 			});
+		}
+
+		// If instructor, verify the submission belongs to one of their students
+		if (req.session.user.role === "instructor") {
+			const instructorId = req.session.user.id;
+			if (submission.user.associatedInstructorId !== instructorId) {
+				return res.status(403).json({
+					success: false,
+					message: "You can only update submissions from your students.",
+				});
+			}
 		}
 
 		await submission.update({
@@ -344,67 +412,88 @@ router.post("/admin/submissions/:id", isAdmin, async (req, res) => {
 	}
 });
 
-// Admin: Trigger AI evaluation for a submission
-router.post("/admin/submissions/:id/evaluate", isAdmin, async (req, res) => {
-	try {
-		const submission = await Completion.findByPk(req.params.id, {
-			include: [
-				{
-					model: User,
-					as: "user",
-					attributes: ["id", "email", "firstName", "lastName"],
-				},
-				{
-					model: Question,
-					as: "question",
-					attributes: ["id", "questionText", "modelDescription"],
-				},
-			],
-		});
+// Admin/Instructor: Trigger AI evaluation for a submission
+router.post(
+	"/admin/submissions/:id/evaluate",
+	isInstructorOrAdmin,
+	async (req, res) => {
+		try {
+			const submission = await Completion.findByPk(req.params.id, {
+				include: [
+					{
+						model: User,
+						as: "user",
+						attributes: [
+							"id",
+							"email",
+							"firstName",
+							"lastName",
+							"associatedInstructorId",
+						],
+					},
+					{
+						model: Question,
+						as: "question",
+						attributes: ["id", "questionText", "modelDescription"],
+					},
+				],
+			});
 
-		if (!submission) {
-			return res.status(404).json({
+			if (!submission) {
+				return res.status(404).json({
+					success: false,
+					message: "Submission not found",
+				});
+			}
+
+			// If instructor, verify the submission belongs to one of their students
+			if (req.session.user.role === "instructor") {
+				const instructorId = req.session.user.id;
+				if (submission.user.associatedInstructorId !== instructorId) {
+					return res.status(403).json({
+						success: false,
+						message: "You can only evaluate submissions from your students.",
+					});
+				}
+			}
+
+			if (!submission.diagramImage) {
+				return res.status(400).json({
+					success: false,
+					message: "No diagram image found for evaluation",
+				});
+			}
+
+			// Use shared AI evaluation function
+			const { aiAnalysis, aiScore } = await evaluateERDiagram(submission);
+
+			// Update completion with AI feedback
+			await submission.update({
+				evaluation: {
+					analysis: aiAnalysis || "AI evaluation not available",
+					score: aiScore,
+					timestamp: new Date().toISOString(),
+				},
+				aiScore,
+				status: aiAnalysis ? "evaluated" : "pending",
+			});
+
+			res.json({
+				success: true,
+				message: "AI evaluation completed successfully",
+				aiScore,
+				aiAnalysis,
+			});
+		} catch (error) {
+			console.error("Error triggering AI evaluation:", error);
+			res.status(500).json({
 				success: false,
-				message: "Submission not found",
+				message: "Error triggering AI evaluation",
+				error: error.message,
 			});
 		}
-
-		if (!submission.diagramImage) {
-			return res.status(400).json({
-				success: false,
-				message: "No diagram image found for evaluation",
-			});
-		}
-
-		// Use shared AI evaluation function
-		const { aiAnalysis, aiScore } = await evaluateERDiagram(submission);
-
-		// Update completion with AI feedback
-		await submission.update({
-			evaluation: {
-				analysis: aiAnalysis || "AI evaluation not available",
-				score: aiScore,
-				timestamp: new Date().toISOString(),
-			},
-			aiScore,
-			status: aiAnalysis ? "evaluated" : "pending",
-		});
-
-		res.json({
-			success: true,
-			message: "AI evaluation completed successfully",
-			aiScore,
-			aiAnalysis,
-		});
-	} catch (error) {
-		console.error("Error triggering AI evaluation:", error);
-		res.status(500).json({
-			success: false,
-			message: "Error triggering AI evaluation",
-			error: error.message,
-		});
 	}
-});
+);
 
 // Student: View their submitted ER diagram
 router.get("/my-submission/:questionId", isAuthenticated, async (req, res) => {
@@ -456,7 +545,7 @@ async function evaluateERDiagram(submission) {
 	try {
 		const imagePath = path.join(
 			__dirname,
-			"../public",
+			"../public/uploads",
 			submission.diagramImage
 		);
 		const imageBuffer = await fs.readFile(imagePath);

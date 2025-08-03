@@ -1,0 +1,240 @@
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/topics">Home</a></li>
+            <li class="breadcrumb-item"><a href="/profile">My Profile</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Course Section Management</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Course Section Management</h4>
+                </div>
+                <div class="card-body">
+                    <% if (locals.success) { %>
+                        <div class="alert alert-success mb-4" id="successAlert">
+                            <%= success %>
+                        </div>
+                        <script>
+                            setTimeout(() => {
+                                const alert = document.getElementById('successAlert');
+                                if (alert) {
+                                    alert.style.display = 'none';
+                                }
+                            }, 5000);
+                        </script>
+                        <% } %>
+
+                            <% if (locals.error) { %>
+                                <div class="alert alert-danger mb-4" id="errorAlert">
+                                    <%= error %>
+                                </div>
+                                <script>
+                                    setTimeout(() => {
+                                        const alert = document.getElementById('errorAlert');
+                                        if (alert) {
+                                            alert.style.display = 'none';
+                                        }
+                                    }, 5000);
+                                </script>
+                                <% } %>
+
+                                    <!-- Current Information -->
+                                    <div class="mb-4">
+                                        <h5>Current Information</h5>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p><strong>Academic Year:</strong>
+                                                    <%= user.academicYear || 'Not set' %>
+                                                </p>
+                                                <p><strong>Semester:</strong>
+                                                    <%= user.semester || 'Not set' %>
+                                                </p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p><strong>Course Section:</strong>
+                                                    <%= user.courseSection || 'Not set' %>
+                                                </p>
+                                                <p><strong>Instructor:</strong>
+                                                    <% if (user.associatedInstructor) { %>
+                                                        <%= user.associatedInstructor.firstName || '' %>
+                                                            <%= user.associatedInstructor.lastName || '' %>
+                                                                (<%= user.associatedInstructor.email %>)
+                                                                    <% } else { %>
+                                                                        <span class="text-danger">No instructor
+                                                                            assigned</span>
+                                                                        <% } %>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <% if (!user.associatedInstructor) { %>
+                                        <div class="alert alert-warning">
+                                            <h6>No Instructor Associated</h6>
+                                            <p class="mb-0">You must be associated with an instructor to manage your
+                                                course section information.
+                                                Please update your profile with an instructor code first.</p>
+                                        </div>
+                                        <% } else { %>
+                                            <!-- Update Form -->
+                                            <form action="/profile/course-section/update" method="POST">
+                                                <h5>Update Course Section Information</h5>
+
+                                                <div class="row mb-3">
+                                                    <div class="col-md-6">
+                                                        <label for="academicYear" class="form-label">Academic
+                                                            Year</label>
+                                                        <select class="form-select" id="academicYear"
+                                                            name="academicYear">
+                                                            <option value="">Select Academic Year</option>
+                                                            <option value="2024-2025" <%=user.academicYear==='2024-2025'
+                                                                ? 'selected' : '' %>>2024-2025</option>
+                                                            <option value="2025-2026" <%=user.academicYear==='2025-2026'
+                                                                ? 'selected' : '' %>>2025-2026</option>
+                                                            <option value="2026-2027" <%=user.academicYear==='2026-2027'
+                                                                ? 'selected' : '' %>>2026-2027</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label for="semester" class="form-label">Semester</label>
+                                                        <select class="form-select" id="semester" name="semester">
+                                                            <option value="">Select Semester</option>
+                                                            <option value="Fall" <%=user.semester==='Fall' ? 'selected'
+                                                                : '' %>>Fall</option>
+                                                            <option value="Spring" <%=user.semester==='Spring'
+                                                                ? 'selected' : '' %>>Spring</option>
+                                                            <option value="Summer" <%=user.semester==='Summer'
+                                                                ? 'selected' : '' %>>Summer</option>
+                                                            <option value="Winter" <%=user.semester==='Winter'
+                                                                ? 'selected' : '' %>>Winter</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label for="courseSection" class="form-label">Course Section</label>
+                                                    <% if (availableCourseSections.length> 0) { %>
+                                                        <select class="form-select" id="courseSection"
+                                                            name="courseSection">
+                                                            <option value="">Select Course Section</option>
+                                                            <% availableCourseSections.forEach(section=> { %>
+                                                                <option
+                                                                    value="<%= section.getFullSectionIdentifier() %>"
+                                                                    <%=user.courseSection===section.getFullSectionIdentifier()
+                                                                    ? 'selected' : '' %>>
+                                                                    <%= section.getDisplayName() %>
+                                                                </option>
+                                                                <% }); %>
+                                                        </select>
+                                                        <div class="form-text">
+                                                            Select a course section from your instructor's available
+                                                            sections.
+                                                            This will automatically set the academic year and semester.
+                                                        </div>
+                                                        <% } else { %>
+                                                            <input type="text" class="form-control" id="courseSection"
+                                                                name="courseSection" value="<%= user.courseSection %>"
+                                                                placeholder="Enter course section (e.g., CS101-A)">
+                                                            <div class="form-text">
+                                                                Enter your course section manually. Make sure it matches
+                                                                one of your instructor's sections.
+                                                            </div>
+                                                            <% } %>
+                                                </div>
+
+                                                <div class="alert alert-info">
+                                                    <h6>How to Update Your Information</h6>
+                                                    <ul class="mb-0">
+                                                        <li><strong>Option 1:</strong> Select a course section from the
+                                                            dropdown to automatically set academic year and semester
+                                                        </li>
+                                                        <li><strong>Option 2:</strong> Manually enter academic year,
+                                                            semester, and course section</li>
+                                                        <li><strong>Note:</strong> You can only select course sections
+                                                            that your instructor has created</li>
+                                                    </ul>
+                                                </div>
+
+                                                <div class="d-grid gap-2">
+                                                    <button type="submit" class="btn btn-primary">Update Course Section
+                                                        Information</button>
+                                                    <a href="/profile" class="btn btn-outline-secondary">Back to
+                                                        Profile</a>
+                                                </div>
+                                            </form>
+
+                                            <!-- Available Course Sections -->
+                                            <% if (availableCourseSections.length> 0) { %>
+                                                <div class="mt-4">
+                                                    <h5>Available Course Sections from Your Instructor</h5>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm table-striped">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th>Course</th>
+                                                                    <th>Section</th>
+                                                                    <th>Academic Year</th>
+                                                                    <th>Semester</th>
+                                                                    <th>Status</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <% availableCourseSections.forEach(section=> { %>
+                                                                    <tr>
+                                                                        <td>
+                                                                            <%= section.courseCode %> - <%=
+                                                                                    section.courseName %>
+                                                                        </td>
+                                                                        <td>
+                                                                            <%= section.sectionCode %>
+                                                                        </td>
+                                                                        <td>
+                                                                            <%= section.academicYear %>
+                                                                        </td>
+                                                                        <td>
+                                                                            <%= section.semester %>
+                                                                        </td>
+                                                                        <td>
+                                                                            <% if (section.isActive) { %>
+                                                                                <span
+                                                                                    class="badge bg-success">Active</span>
+                                                                                <% } else { %>
+                                                                                    <span
+                                                                                        class="badge bg-secondary">Inactive</span>
+                                                                                    <% } %>
+                                                                        </td>
+                                                                    </tr>
+                                                                    <% }); %>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                                <% } %>
+                                                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: all 0.2s ease-in-out;
+    }
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    .table tbody tr {
+        transition: background-color 0.2s;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+</style>

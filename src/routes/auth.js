@@ -23,6 +23,7 @@ router.post("/login", isNotAuthenticated, async (req, res) => {
 			email,
 			userFound: !!user,
 			isAdmin: user?.isAdmin,
+			role: user?.role,
 			isAdminType: typeof user?.isAdmin,
 		});
 
@@ -43,7 +44,10 @@ router.post("/login", isNotAuthenticated, async (req, res) => {
 			firstName: user.firstName || "",
 			lastName: user.lastName || "",
 			code: user.code || "",
-			isAdmin: Boolean(user.isAdmin), // Explicitly convert to boolean
+			isAdmin: Boolean(user.isAdmin), // Backward compatibility
+			role: user.role || (user.isAdmin ? "admin" : "student"), // New role system
+			instructorCode: user.instructorCode || null,
+			associatedInstructorId: user.associatedInstructorId || null,
 		};
 
 		// Debug logging
@@ -51,6 +55,7 @@ router.post("/login", isNotAuthenticated, async (req, res) => {
 			userId: req.session.userId,
 			user: req.session.user,
 			isAdmin: req.session.user.isAdmin,
+			role: req.session.user.role,
 			isAdminType: typeof req.session.user.isAdmin,
 		});
 
@@ -70,12 +75,15 @@ router.post("/login", isNotAuthenticated, async (req, res) => {
 				userId: req.session.userId,
 				user: req.session.user,
 				isAdmin: req.session.user.isAdmin,
+				role: req.session.user.role,
 				isAdminType: typeof req.session.user.isAdmin,
 			});
 
-			// Redirect admin users to admin dashboard, regular users to topics page
-			if (user.isAdmin) {
+			// Redirect based on role
+			if (user.role === "admin" || user.isAdmin) {
 				return res.redirect("/admin");
+			} else if (user.role === "instructor") {
+				return res.redirect("/instructor/dashboard");
 			} else {
 				return res.redirect("/topics");
 			}
@@ -98,8 +106,15 @@ router.get("/register", isNotAuthenticated, (req, res) => {
 // Process registration
 router.post("/register", isNotAuthenticated, async (req, res) => {
 	try {
-		const { email, password, confirmPassword, firstName, lastName, code } =
-			req.body;
+		const {
+			email,
+			password,
+			confirmPassword,
+			firstName,
+			lastName,
+			instructorCode,
+			courseSection,
+		} = req.body;
 
 		// Basic validation
 		if (!email || !password || !confirmPassword) {
@@ -109,7 +124,7 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 				email,
 				firstName,
 				lastName,
-				code,
+				instructorCode,
 			});
 		}
 
@@ -121,7 +136,7 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 				email,
 				firstName,
 				lastName,
-				code,
+				instructorCode,
 			});
 		}
 
@@ -134,7 +149,7 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 				email,
 				firstName,
 				lastName,
-				code,
+				instructorCode,
 			});
 		}
 
@@ -147,7 +162,7 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 				email,
 				firstName,
 				lastName,
-				code,
+				instructorCode,
 			});
 		}
 
@@ -160,8 +175,61 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 				email,
 				firstName,
 				lastName,
-				code,
+				instructorCode,
 			});
+		}
+
+		// Validate instructor code if provided
+		let associatedInstructorId = null;
+		let academicYear = null;
+		let semester = null;
+		let validatedCourseSection = null;
+
+		if (instructorCode && instructorCode.trim()) {
+			const instructor = await User.findInstructorByCode(instructorCode.trim());
+			if (!instructor) {
+				return res.render("pages/register", {
+					title: "Register",
+					error:
+						"Invalid instructor code. Please check the code or leave it blank if you don't have one.",
+					email,
+					firstName,
+					lastName,
+					instructorCode,
+					courseSection,
+				});
+			}
+			associatedInstructorId = instructor.id;
+
+			// Validate course section if provided
+			if (courseSection && courseSection.trim()) {
+				const { InstructorCourseSection } = require("../models");
+				const courseSectionRecord = await InstructorCourseSection.findOne({
+					where: {
+						instructorId: instructor.id,
+						courseCode: courseSection.split("-")[0], // Extract course code
+						sectionCode: courseSection.split("-")[1] || courseSection, // Extract section code
+						isActive: true,
+					},
+				});
+
+				if (courseSectionRecord) {
+					validatedCourseSection =
+						courseSectionRecord.getFullSectionIdentifier();
+					academicYear = courseSectionRecord.academicYear;
+					semester = courseSectionRecord.semester;
+				} else {
+					// If course section not found, use current academic year/semester
+					academicYear = InstructorCourseSection.getCurrentAcademicYear();
+					semester = InstructorCourseSection.getCurrentSemester();
+					validatedCourseSection = courseSection.trim();
+				}
+			} else {
+				// If no course section provided, use current academic year/semester
+				const { InstructorCourseSection } = require("../models");
+				academicYear = InstructorCourseSection.getCurrentAcademicYear();
+				semester = InstructorCourseSection.getCurrentSemester();
+			}
 		}
 
 		// Hash password
@@ -173,8 +241,13 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 			passwordHash,
 			firstName: firstName || null,
 			lastName: lastName || null,
-			code: code || null,
+			code: null, // Keep the old code field for backward compatibility
 			isAdmin: false, // Explicitly set isAdmin to false for new users
+			role: "student", // Set role to student
+			associatedInstructorId: associatedInstructorId,
+			academicYear: academicYear,
+			semester: semester,
+			courseSection: validatedCourseSection,
 		});
 
 		// Set session (automatic login after registration)
@@ -186,6 +259,9 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 			lastName: newUser.lastName || "",
 			code: newUser.code || "",
 			isAdmin: newUser.isAdmin || false,
+			role: newUser.role || "student",
+			instructorCode: newUser.instructorCode || null,
+			associatedInstructorId: newUser.associatedInstructorId || null,
 		};
 
 		// Redirect to topics page
@@ -200,7 +276,7 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 			email: req.body.email,
 			firstName: req.body.firstName,
 			lastName: req.body.lastName,
-			code: req.body.code,
+			instructorCode: req.body.instructorCode,
 		});
 	}
 });
@@ -232,8 +308,30 @@ router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
 		const user = await User.findOne({ where: { email } });
 
 		if (user) {
+			// Check if user already has a valid reset token (not expired and not used)
+			const existingToken = await User.validateResetToken(user.resetToken);
+
+			if (existingToken) {
+				// User already has a valid reset token, don't send another email
+				console.log(
+					`Password reset already requested for ${email}, token still valid`
+				);
+				return res.render("pages/forgot-password", {
+					title: "Forgot Password",
+					error: null,
+					success:
+						"If an account with that email exists, a password reset link has been sent.",
+				});
+			}
+
 			// Generate reset token
 			const resetToken = await User.createPasswordReset(user);
+			console.log(
+				`Generated new reset token for ${email}: ${resetToken.substring(
+					0,
+					8
+				)}...`
+			);
 
 			// Send email
 			const emailService = require("../utils/emailService");
@@ -244,6 +342,7 @@ router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
 			);
 
 			if (emailSent) {
+				console.log(`Password reset email sent successfully to ${email}`);
 				return res.render("pages/forgot-password", {
 					title: "Forgot Password",
 					error: null,
@@ -251,6 +350,7 @@ router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
 						"If an account with that email exists, a password reset link has been sent.",
 				});
 			} else {
+				console.error(`Failed to send password reset email to ${email}`);
 				return res.render("pages/forgot-password", {
 					title: "Forgot Password",
 					error: "Failed to send reset email. Please try again later.",
@@ -259,6 +359,7 @@ router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
 			}
 		} else {
 			// Don't reveal if user exists or not (security best practice)
+			console.log(`Password reset requested for non-existent email: ${email}`);
 			return res.render("pages/forgot-password", {
 				title: "Forgot Password",
 				error: null,

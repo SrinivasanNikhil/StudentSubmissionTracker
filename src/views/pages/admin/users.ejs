@@ -65,7 +65,7 @@
                             <th>Email</th>
                             <th>Name</th>
                             <th>Registered</th>
-                            <th>Admin</th>
+                            <th>Role</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -95,14 +95,16 @@
                                             <%= new Date(user.createdAt).toLocaleDateString() %>
                                         </td>
                                         <td>
-                                            <% if (user.isAdmin) { %>
-                                                <span class="badge bg-primary">Yes</span>
-                                                <% } else { %>
-                                                    <span class="badge bg-secondary">No</span>
-                                                    <% } %>
+                                            <% if (user.role==='admin' ) { %>
+                                                <span class="badge bg-danger">Admin</span>
+                                                <% } else if (user.role==='instructor' ) { %>
+                                                    <span class="badge bg-warning">Instructor</span>
+                                                    <% } else { %>
+                                                        <span class="badge bg-info">Student</span>
+                                                        <% } %>
                                         </td>
                                         <td>
-                                            <% if (!user.isAdmin) { %>
+                                            <% if (user.role !=='admin' ) { %>
                                                 <button class="btn btn-sm btn-danger delete-user"
                                                     data-id="<%= user.id %>" data-email="<%= user.email %>">
                                                     <i class="bi bi-trash"></i> Delete

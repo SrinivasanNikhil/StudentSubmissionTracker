@@ -1,0 +1,185 @@
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/instructor/dashboard">Instructor Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">ER Diagram Submissions</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>ER Diagram Submissions</h1>
+        <div class="btn-group" role="group" aria-label="Export options">
+            <a href="/instructor/export/submissions" class="btn btn-outline-primary" title="Export Submissions Data">
+                <i class="bi bi-download me-1"></i> Export Data
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Submissions (<%= totalSubmissions %>)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student</th>
+                            <th>Question</th>
+                            <th>Status</th>
+                            <th>AI Score</th>
+                            <th>Admin Score</th>
+                            <th>Submitted</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (submissions.length===0) { %>
+                            <tr>
+                                <td colspan="7" class="text-center py-4">No ER diagram submissions found</td>
+                            </tr>
+                            <% } else { %>
+                                <% submissions.forEach(submission=> { %>
+                                    <tr>
+                                        <td>
+                                            <div>
+                                                <strong>
+                                                    <%= submission.user.firstName || '' %>
+                                                        <%= submission.user.lastName || '' %>
+                                                </strong>
+                                                <% if (!submission.user.firstName && !submission.user.lastName) { %>
+                                                    <span class="text-muted">Not provided</span>
+                                                    <% } %>
+                                                        <br>
+                                                        <small class="text-muted">
+                                                            <%= submission.user.email %>
+                                                        </small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <% if (submission.question) { %>
+                                                <div>
+                                                    <strong>
+                                                        <%= submission.question.topic ? submission.question.topic.name
+                                                            : 'Unknown Topic' %>
+                                                    </strong>
+                                                    <br>
+                                                    <small class="text-muted">Q<%= submission.question.questionNumber %>
+                                                            </small>
+                                                </div>
+                                                <% } else { %>
+                                                    <span class="text-muted">Question not found</span>
+                                                    <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (submission.status==='pending' ) { %>
+                                                <span class="badge bg-warning">Pending</span>
+                                                <% } else if (submission.status==='evaluated' ) { %>
+                                                    <span class="badge bg-info">Evaluated</span>
+                                                    <% } else if (submission.status==='reviewed' ) { %>
+                                                        <span class="badge bg-success">Reviewed</span>
+                                                        <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (submission.aiScore !==null) { %>
+                                                <span class="badge bg-primary">
+                                                    <%= submission.aiScore %>/10
+                                                </span>
+                                                <% } else { %>
+                                                    <span class="text-muted">-</span>
+                                                    <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (submission.adminScore !==null) { %>
+                                                <span class="badge bg-success">
+                                                    <%= submission.adminScore %>/10
+                                                </span>
+                                                <% } else { %>
+                                                    <span class="text-muted">-</span>
+                                                    <% } %>
+                                        </td>
+                                        <td>
+                                            <%= new Date(submission.createdAt).toLocaleDateString() %>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="/instructor/submissions/<%= submission.id %>"
+                                                    class="btn btn-sm btn-outline-primary" title="View Submission">
+                                                    <i class="bi bi-eye"></i> View
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <% }); %>
+                                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <% if (totalPages> 1) { %>
+            <div class="card-footer d-flex justify-content-center">
+                <nav aria-label="Submission pagination">
+                    <ul class="pagination mb-0">
+                        <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                            <a class="page-link" href="/instructor/submissions?page=1&limit=<%= limit %>"
+                                aria-label="First">
+                                <span aria-hidden="true">&laquo;&laquo;</span>
+                            </a>
+                        </li>
+                        <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                            <a class="page-link"
+                                href="/instructor/submissions?page=<%= currentPage - 1 %>&limit=<%= limit %>"
+                                aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+
+                        <% let startPage=Math.max(1, currentPage - 2); let endPage=Math.min(totalPages, startPage + 4);
+                            if (endPage - startPage < 4) { startPage=Math.max(1, endPage - 4); } for (let i=startPage; i
+                            <=endPage; i++) { %>
+                            <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                                <a class="page-link" href="/instructor/submissions?page=<%= i %>&limit=<%= limit %>">
+                                    <%= i %>
+                                </a>
+                            </li>
+                            <% } %>
+
+                                <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                                    <a class="page-link"
+                                        href="/instructor/submissions?page=<%= currentPage + 1 %>&limit=<%= limit %>"
+                                        aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                                <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                                    <a class="page-link"
+                                        href="/instructor/submissions?page=<%= totalPages %>&limit=<%= limit %>"
+                                        aria-label="Last">
+                                        <span aria-hidden="true">&raquo;&raquo;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </nav>
+            </div>
+            <% } %>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: all 0.2s ease-in-out;
+    }
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    .table tbody tr {
+        transition: background-color 0.2s;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+</style>

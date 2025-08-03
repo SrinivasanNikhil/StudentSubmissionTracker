@@ -11,7 +11,6 @@ const {
 } = require("./config/database");
 const { loadReferenceData } = require("./utils/referenceLoader");
 const createDatabase = require("./config/create-db");
-const { Topic } = require("./models");
 const SequelizeStore = require("connect-session-sequelize")(session.Store);
 
 // Load environment variables
@@ -84,6 +83,7 @@ app.use((req, res, next) => {
 			hasUser: !!req.session?.user,
 			userData: req.session?.user,
 			isAdmin: req.session?.user?.isAdmin,
+			role: req.session?.user?.role,
 			isAdminType: typeof req.session?.user?.isAdmin,
 			sessionID: req.sessionID,
 			cookie: req.session?.cookie,
@@ -97,7 +97,10 @@ app.use((req, res, next) => {
 			// Ensure we're working with a fresh copy of the user data
 			const userData = {
 				...req.session.user,
-				isAdmin: Boolean(req.session.user.isAdmin),
+				isAdmin: Boolean(req.session.user.isAdmin), // Backward compatibility
+				role:
+					req.session.user.role ||
+					(req.session.user.isAdmin ? "admin" : "student"), // New role system
 			};
 
 			res.locals.user = userData;
@@ -106,6 +109,7 @@ app.use((req, res, next) => {
 			console.log("Template middleware - Locals set:", {
 				user: res.locals.user,
 				isAdmin: res.locals.user.isAdmin,
+				role: res.locals.user.role,
 				isAdminType: typeof res.locals.user.isAdmin,
 				sessionID: req.sessionID,
 			});
@@ -124,20 +128,24 @@ app.use((req, res, next) => {
 
 // Import routes
 const authRoutes = require("./routes/auth");
+const adminRoutes = require("./routes/admin");
+const instructorRoutes = require("./routes/instructor");
+const instructorCourseManagementRoutes = require("./routes/instructor-course-management");
 const topicRoutes = require("./routes/topics");
 const questionRoutes = require("./routes/questions");
 const completionRoutes = require("./routes/completions");
 const profileRoutes = require("./routes/profile");
-const adminRoutes = require("./routes/admin");
 const erDiagramRoutes = require("./routes/er-diagrams");
 
 // Register routes
 app.use("/auth", authRoutes);
+app.use("/admin", adminRoutes);
+app.use("/instructor", instructorRoutes);
+app.use("/instructor/course-management", instructorCourseManagementRoutes);
 app.use("/topics", topicRoutes);
 app.use("/questions", questionRoutes);
 app.use("/completions", completionRoutes);
 app.use("/profile", profileRoutes);
-app.use("/admin", adminRoutes);
 app.use("/er-diagrams", erDiagramRoutes);
 
 // Root-level auth routes (for backward compatibility and direct access)

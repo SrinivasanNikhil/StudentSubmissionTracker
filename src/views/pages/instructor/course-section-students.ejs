@@ -1,0 +1,142 @@
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/instructor/dashboard">Instructor Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/instructor/course-management">Course Sections</a></li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <%= courseSection.getDisplayName() %> - Students
+            </li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <%= courseSection.getDisplayName() %> - Students
+        </h1>
+        <a href="/instructor/course-management" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back to Course Sections
+        </a>
+    </div>
+
+    <!-- Course Section Information -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Course Section Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Course Code:</strong>
+                        <%= courseSection.courseCode %>
+                    </p>
+                    <p><strong>Course Name:</strong>
+                        <%= courseSection.courseName %>
+                    </p>
+                    <p><strong>Section:</strong>
+                        <%= courseSection.sectionCode %>
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Academic Year:</strong>
+                        <%= courseSection.academicYear %>
+                    </p>
+                    <p><strong>Semester:</strong>
+                        <%= courseSection.semester %>
+                    </p>
+                    <p><strong>Status:</strong>
+                        <% if (courseSection.isActive) { %>
+                            <span class="badge bg-success">Active</span>
+                            <% } else { %>
+                                <span class="badge bg-secondary">Inactive</span>
+                                <% } %>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Students List -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Students (<%= students.length %>)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Completions</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (students.length===0) { %>
+                            <tr>
+                                <td colspan="6" class="text-center py-4">No students enrolled in this course section
+                                </td>
+                            </tr>
+                            <% } else { %>
+                                <% students.forEach(student=> { %>
+                                    <tr>
+                                        <td>
+                                            <%= student.id %>
+                                        </td>
+                                        <td>
+                                            <% if (student.firstName || student.lastName) { %>
+                                                <%= student.firstName || '' %>
+                                                    <%= student.lastName || '' %>
+                                                        <% } else { %>
+                                                            <span class="text-muted">Not provided</span>
+                                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <%= student.email %>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">
+                                                <%= student.completionCount || 0 %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <%= new Date(student.createdAt).toLocaleDateString() %>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="/instructor/students/<%= student.id %>"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    title="View Student Progress">
+                                                    <i class="bi bi-eye"></i> Progress
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <% }); %>
+                                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: all 0.2s ease-in-out;
+    }
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    .table tbody tr {
+        transition: background-color 0.2s;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+</style>

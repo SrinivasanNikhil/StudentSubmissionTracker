@@ -25,10 +25,18 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="code" class="form-label">Code (Optional)</label>
-                        <input type="text" class="form-control" id="code" name="code" placeholder="Enter your code"
-                            value="<%= locals.code || '' %>">
-                        <div class="form-text">Enter a code if you have one. This can be changed later.</div>
+                        <label for="instructorCode" class="form-label">Instructor Code (Optional)</label>
+                        <input type="text" class="form-control" id="instructorCode" name="instructorCode"
+                            placeholder="Enter your instructor's code" value="<%= locals.instructorCode || '' %>">
+                        <div class="form-text">If you have an instructor code, enter it here to be associated with your
+                            instructor. This can be changed later in your profile.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="courseSection" class="form-label">Course Section (Optional)</label>
+                        <input type="text" class="form-control" id="courseSection" name="courseSection"
+                            placeholder="e.g., CS101-A, CS201-B" value="<%= locals.courseSection || '' %>">
+                        <div class="form-text">If you know your specific course section, enter it here (e.g., CS101-A).
+                            This helps organize students by semester and section.</div>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>

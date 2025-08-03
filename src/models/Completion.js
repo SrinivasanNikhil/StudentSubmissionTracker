@@ -92,6 +92,24 @@ module.exports = (sequelize) => {
 				defaultValue: "pending",
 				comment: "Current status of the submission",
 			},
+			// Semester tracking fields
+			academicYear: {
+				type: DataTypes.STRING(20),
+				allowNull: true,
+				field: "academic_year",
+				comment: "Academic year when completion occurred",
+			},
+			semester: {
+				type: DataTypes.ENUM("Fall", "Spring", "Summer", "Winter"),
+				allowNull: true,
+				comment: "Semester when completion occurred",
+			},
+			courseSection: {
+				type: DataTypes.STRING(50),
+				allowNull: true,
+				field: "course_section",
+				comment: "Course section when completion occurred",
+			},
 		},
 		{
 			sequelize,
@@ -99,6 +117,13 @@ module.exports = (sequelize) => {
 			tableName: "completions",
 			timestamps: true,
 			underscored: true,
+			indexes: [
+				{
+					unique: true,
+					fields: ["userId", "questionId"],
+					name: "unique_user_question_completion",
+				},
+			],
 		}
 	);
 

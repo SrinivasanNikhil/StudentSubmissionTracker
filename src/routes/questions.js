@@ -182,10 +182,20 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 
 				// If not already completed, mark it as completed
 				if (!existingCompletion) {
+					// Get user's semester information
+					const user = await User.findByPk(userId);
+					const { InstructorCourseSection } = require("../models");
+
 					await Completion.create({
 						userId,
 						questionId: id,
 						completedAt: new Date(),
+						academicYear:
+							user.academicYear ||
+							InstructorCourseSection.getCurrentAcademicYear(),
+						semester:
+							user.semester || InstructorCourseSection.getCurrentSemester(),
+						courseSection: user.courseSection,
 					});
 				}
 

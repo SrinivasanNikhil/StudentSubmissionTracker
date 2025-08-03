@@ -1,0 +1,331 @@
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/instructor/dashboard">Instructor Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/instructor/submissions">ER Diagram Submissions</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Submission Detail</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Submission Detail</h1>
+        <a href="/instructor/submissions" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back to Submissions
+        </a>
+    </div>
+
+    <!-- Submission Information -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Submission Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Student:</strong>
+                        <%= submission.user.firstName || '' %>
+                            <%= submission.user.lastName || '' %>
+                    </p>
+                    <p><strong>Email:</strong>
+                        <%= submission.user.email %>
+                    </p>
+                    <p><strong>Question:</strong>
+                        <% if (submission.question) { %>
+                            <%= submission.question.topic ? submission.question.topic.name : 'Unknown Topic' %> - Q<%=
+                                    submission.question.questionNumber %>
+                                    <% } else { %>
+                                        <span class="text-muted">Question not found</span>
+                                        <% } %>
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Status:</strong>
+                        <% if (submission.status==='pending' ) { %>
+                            <span class="badge bg-warning">Pending</span>
+                            <% } else if (submission.status==='evaluated' ) { %>
+                                <span class="badge bg-info">Evaluated</span>
+                                <% } else if (submission.status==='reviewed' ) { %>
+                                    <span class="badge bg-success">Reviewed</span>
+                                    <% } %>
+                    </p>
+                    <p><strong>Submitted:</strong>
+                        <%= new Date(submission.createdAt).toLocaleDateString() %>
+                    </p>
+                    <p><strong>Completed:</strong>
+                        <%= new Date(submission.completedAt).toLocaleDateString() %>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ER Diagram Image -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">ER Diagram</h5>
+        </div>
+        <div class="card-body text-center">
+            <% if (submission.diagramImage) { %>
+                <img src="/uploads<%= submission.diagramImage %>" alt="ER Diagram" class="img-fluid border rounded"
+                    style="max-width: 100%; max-height: 600px;">
+                <% } else { %>
+                    <p class="text-muted">No diagram image available</p>
+                    <% } %>
+        </div>
+    </div>
+
+    <!-- Student Enhancements -->
+    <% if (submission.enhancements) { %>
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Student Enhancements</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    <%= submission.enhancements %>
+                </p>
+            </div>
+        </div>
+        <% } %>
+
+            <!-- AI Reflection -->
+            <% if (submission.aiReflection) { %>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">AI Tool Reflection</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>
+                            <%= submission.aiReflection %>
+                        </p>
+                    </div>
+                </div>
+                <% } %>
+
+                    <!-- Evaluation Results -->
+                    <div class="row">
+                        <!-- AI Evaluation -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">AI Evaluation</h5>
+                                    <button type="button" class="btn btn-info btn-sm" id="triggerAIEvaluation">
+                                        <i class="bi bi-robot me-1"></i> Trigger AI Evaluation
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <% if (submission.aiScore !==null) { %>
+                                        <p><strong>Score:</strong> <span class="badge bg-primary fs-6">
+                                                <%= submission.aiScore %>/10
+                                            </span></p>
+                                        <% } else { %>
+                                            <p><strong>Score:</strong> <span class="text-muted">Not evaluated</span></p>
+                                            <% } %>
+
+                                                <% if (aiFeedback && aiFeedback !=="No AI feedback available" ) { %>
+                                                    <div class="mt-3">
+                                                        <h6>AI Feedback:</h6>
+                                                        <div class="bg-light p-3 rounded">
+                                                            <%= aiFeedback %>
+                                                        </div>
+                                                    </div>
+                                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Instructor Evaluation -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Instructor Evaluation</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="reviewForm">
+                                        <div class="mb-3">
+                                            <label for="adminScore" class="form-label">Score (0-10)</label>
+                                            <input type="number" class="form-control" id="adminScore" name="adminScore"
+                                                min="0" max="10" value="<%= submission.adminScore || '' %>">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="adminComments" class="form-label">Comments</label>
+                                            <textarea class="form-control" id="adminComments" name="adminComments"
+                                                rows="4"
+                                                placeholder="Enter your review comments here..."><%= submission.adminComments || '' %></textarea>
+                                        </div>
+                                        <div class="d-grid">
+                                            <button type="submit" class="btn btn-primary" id="submitReview">
+                                                <i class="bi bi-save me-2"></i> Save Review
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Question Details -->
+                    <% if (submission.question) { %>
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Question Details</h5>
+                            </div>
+                            <div class="card-body">
+                                <h6>Question Text:</h6>
+                                <p>
+                                    <%= submission.question.questionText %>
+                                </p>
+
+                                <% if (submission.question.modelDescription) { %>
+                                    <h6>Model Description:</h6>
+                                    <p>
+                                        <%= submission.question.modelDescription %>
+                                    </p>
+                                    <% } %>
+
+                                        <% if (submission.question.baseEntities) { %>
+                                            <h6>Base Entities:</h6>
+                                            <div class="bg-light p-3 rounded">
+                                                <pre><%= submission.question.baseEntities %></pre>
+                                            </div>
+                                            <% } %>
+
+                                                <% if (submission.question.baseRelationships) { %>
+                                                    <h6>Base Relationships:</h6>
+                                                    <div class="bg-light p-3 rounded">
+                                                        <pre><%= submission.question.baseRelationships %></pre>
+                                                    </div>
+                                                    <% } %>
+                            </div>
+                        </div>
+                        <% } %>
+</div>
+
+<script>
+    // Review form submission
+    document.getElementById('reviewForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const form = e.target;
+        const submitButton = document.getElementById('submitReview');
+        const formData = new FormData(form);
+
+        try {
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Saving...';
+
+            const response = await fetch('/instructor/submissions/<%= submission.id %>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    adminScore: formData.get('adminScore'),
+                    adminComments: formData.get('adminComments')
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Show success message
+                const toast = document.createElement('div');
+                toast.className = 'position-fixed bottom-0 end-0 p-3';
+                toast.style.zIndex = '5';
+                toast.innerHTML = `
+                    <div class="toast show" role="alert">
+                        <div class="toast-header">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            <strong class="me-auto">Success</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                        </div>
+                        <div class="toast-body">
+                            Review saved successfully!
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            } else {
+                throw new Error(data.message || 'Failed to save review');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message || 'Error saving review. Please try again.');
+        } finally {
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="bi bi-save me-2"></i>Save Review';
+        }
+    });
+
+    // AI Evaluation functionality
+    document.getElementById('triggerAIEvaluation').addEventListener('click', async (e) => {
+        e.preventDefault();
+
+        const button = e.target;
+        const originalText = button.innerHTML;
+
+        try {
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Evaluating...';
+
+            const response = await fetch('/er-diagrams/admin/submissions/<%= submission.id %>/evaluate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Show success message
+                const toast = document.createElement('div');
+                toast.className = 'position-fixed bottom-0 end-0 p-3';
+                toast.style.zIndex = '5';
+                toast.innerHTML = `
+                    <div class="toast show" role="alert">
+                        <div class="toast-header">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            <strong class="me-auto">AI Evaluation Complete</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                        </div>
+                        <div class="toast-body">
+                            AI evaluation completed successfully! Refreshing page...
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+
+                // Refresh the page after a short delay to show updated AI evaluation
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error(data.message || 'Failed to trigger AI evaluation');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message || 'Error triggering AI evaluation. Please try again.');
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    });
+</script>
+
+<style>
+    .card {
+        transition: all 0.2s ease-in-out;
+    }
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin-bottom: 0;
+    }
+</style>

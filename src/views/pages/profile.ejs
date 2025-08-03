@@ -20,70 +20,152 @@
                     </script>
                     <% } %>
 
-                        <form action="/profile/update" method="POST">
-                            <div class="mb-4">
-                                <label for="email" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" id="email" value="<%= user.email %>" readonly
-                                    disabled>
-                                <div class="form-text text-muted">Your email address cannot be changed.</div>
+                        <% if (locals.error) { %>
+                            <div class="alert alert-danger mb-4" id="errorAlert">
+                                <%= error %>
                             </div>
+                            <script>
+                                // Auto hide error message after 5 seconds
+                                setTimeout(() => {
+                                    const alert = document.getElementById('errorAlert');
+                                    if (alert) {
+                                        alert.style.display = 'none';
+                                    }
+                                }, 5000);
+                            </script>
+                            <% } %>
 
-                            <div class="row mb-4">
-                                <div class="col-md-6">
-                                    <label for="firstName" class="form-label">First Name</label>
-                                    <input type="text" class="form-control" id="firstName" name="firstName"
-                                        value="<%= user.firstName %>" placeholder="Enter your first name">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="lastName" class="form-label">Last Name</label>
-                                    <input type="text" class="form-control" id="lastName" name="lastName"
-                                        value="<%= user.lastName %>" placeholder="Enter your last name">
-                                </div>
-                            </div>
+                                <form action="/profile/update" method="POST">
+                                    <div class="mb-4">
+                                        <label for="email" class="form-label">Email Address</label>
+                                        <input type="email" class="form-control" id="email" value="<%= user.email %>"
+                                            readonly disabled>
+                                        <div class="form-text text-muted">Your email address cannot be changed.</div>
+                                    </div>
 
-                            <div class="mb-4">
-                                <label for="code" class="form-label">Code</label>
-                                <input type="text" class="form-control" id="code" name="code" value="<%= user.code %>"
-                                    placeholder="Enter your code">
-                                <div class="form-text text-muted">You can set or change your code here.</div>
-                            </div>
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <label for="firstName" class="form-label">First Name</label>
+                                            <input type="text" class="form-control" id="firstName" name="firstName"
+                                                value="<%= user.firstName %>" placeholder="Enter your first name">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="lastName" class="form-label">Last Name</label>
+                                            <input type="text" class="form-control" id="lastName" name="lastName"
+                                                value="<%= user.lastName %>" placeholder="Enter your last name">
+                                        </div>
+                                    </div>
 
-                            <div class="mb-4 border-top pt-4">
-                                <h5>Account Information</h5>
-                                <p class="text-muted">You are registered with the email: <strong>
-                                        <%= user.email %>
-                                    </strong></p>
-                                <p class="text-muted">
-                                    <% if (user.firstName && user.lastName) { %>
-                                        Your name is set to: <strong>
-                                            <%= user.firstName %>
-                                                <%= user.lastName %>
-                                        </strong>
-                                        <% } else if (user.firstName) { %>
-                                            Your first name is set to: <strong>
-                                                <%= user.firstName %>
-                                            </strong>
-                                            <% } else if (user.lastName) { %>
-                                                Your last name is set to: <strong>
-                                                    <%= user.lastName %>
-                                                </strong>
-                                                <% } else { %>
-                                                    You haven't set your name yet.
-                                                    <% } %>
-                                </p>
-                                <% if (user.code) { %>
-                                    <p class="text-muted">Your code is set to: <strong>
-                                            <%= user.code %>
-                                        </strong></p>
-                                    <% } else { %>
-                                        <p class="text-muted">You haven't set a code yet.</p>
+                                    <div class="mb-4">
+                                        <label for="instructorCode" class="form-label">Associated Instructor</label>
+                                        <% if (user.associatedInstructor) { %>
+                                            <div class="alert alert-info mb-3">
+                                                <strong>Current Instructor:</strong>
+                                                <%= user.associatedInstructor.firstName || '' %>
+                                                    <%= user.associatedInstructor.lastName || '' %>
+                                                        (<%= user.associatedInstructor.email %>)
+                                            </div>
+                                            <% } else { %>
+                                                <div class="alert alert-warning mb-3">
+                                                    <strong>No instructor assigned.</strong> Enter an instructor code
+                                                    below to associate with an instructor.
+                                                </div>
+                                                <% } %>
+                                                    <input type="text" class="form-control" id="instructorCode"
+                                                        name="instructorCode" value="<%= user.instructorCode || '' %>"
+                                                        placeholder="Enter instructor code to change association">
+                                                    <div class="form-text text-muted">Enter an instructor code to change
+                                                        your associated instructor. Leave blank to remove association.
+                                                    </div>
+                                    </div>
+
+                                    <!-- Course Section Information (for students) -->
+                                    <% if (user.role==='student' ) { %>
+                                        <div class="mb-4 border-top pt-4">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <h5>Course Section Information</h5>
+                                                <a href="/profile/course-section"
+                                                    class="btn btn-outline-primary btn-sm">
+                                                    <i class="bi bi-gear me-1"></i> Manage Course Section
+                                                </a>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <p><strong>Academic Year:</strong><br>
+                                                        <span
+                                                            class="<%= user.academicYear ? 'text-success' : 'text-muted' %>">
+                                                            <%= user.academicYear || 'Not set' %>
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <p><strong>Semester:</strong><br>
+                                                        <span
+                                                            class="<%= user.semester ? 'text-success' : 'text-muted' %>">
+                                                            <%= user.semester || 'Not set' %>
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <p><strong>Course Section:</strong><br>
+                                                        <span
+                                                            class="<%= user.courseSection ? 'text-success' : 'text-muted' %>">
+                                                            <%= user.courseSection || 'Not set' %>
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <% if (!user.academicYear || !user.semester || !user.courseSection) { %>
+                                                <div class="alert alert-warning">
+                                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                                    <strong>Incomplete Course Information:</strong>
+                                                    Please update your course section information to help your
+                                                    instructor track your progress.
+                                                </div>
+                                                <% } %>
+                                        </div>
                                         <% } %>
-                            </div>
 
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
-                            </div>
-                        </form>
+                                            <div class="mb-4 border-top pt-4">
+                                                <h5>Account Information</h5>
+                                                <p class="text-muted">You are registered with the email: <strong>
+                                                        <%= user.email %>
+                                                    </strong></p>
+                                                <p class="text-muted">
+                                                    <% if (user.firstName && user.lastName) { %>
+                                                        Your name is set to: <strong>
+                                                            <%= user.firstName %>
+                                                                <%= user.lastName %>
+                                                        </strong>
+                                                        <% } else if (user.firstName) { %>
+                                                            Your first name is set to: <strong>
+                                                                <%= user.firstName %>
+                                                            </strong>
+                                                            <% } else if (user.lastName) { %>
+                                                                Your last name is set to: <strong>
+                                                                    <%= user.lastName %>
+                                                                </strong>
+                                                                <% } else { %>
+                                                                    You haven't set your name yet.
+                                                                    <% } %>
+                                                </p>
+                                                <% if (user.associatedInstructor) { %>
+                                                    <p class="text-muted">Your associated instructor is: <strong>
+                                                            <%= user.associatedInstructor.firstName || '' %>
+                                                                <%= user.associatedInstructor.lastName || '' %>
+                                                        </strong></p>
+                                                    <% } else { %>
+                                                        <p class="text-muted">You are not associated with any
+                                                            instructor.</p>
+                                                        <% } %>
+                                            </div>
+
+                                            <div class="d-grid gap-2">
+                                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                                            </div>
+                                </form>
             </div>
         </div>
     </div>
