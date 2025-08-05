@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Question, Topic, Completion } = require("../models");
+const { Question, Topic, Completion, User } = require("../models");
 const { isAuthenticated } = require("../middleware/auth");
 const { executeQuery, compareQueries } = require("../services/sqlExecutor");
 const { OpenAI } = require("openai");
