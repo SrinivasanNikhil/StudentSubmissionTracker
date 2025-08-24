@@ -1,0 +1,82 @@
+{
+	"title": "Northwind - Single Entity",
+	"type": "sql",
+	"database": "Northwind",
+	"questions": [
+		{
+			"number": 1,
+			"text": "Prepare a list of customers sorted by country, region, city.",
+			"solution_query": "SELECT Country, Region, City FROM Customers ORDER BY Country, Region, City"
+		},
+		{
+			"number": 2,
+			"text": "How many employees are there in the company?",
+			"solution_query": "SELECT COUNT(EmployeeID) FROM Employees"
+		},
+		{
+			"number": 3,
+			"text": "What is the total freight cost for all orders?",
+			"solution_query": "SELECT SUM(Freight) FROM Orders"
+		},
+		{
+			"number": 4,
+			"text": "List the categories that contain 'Beverages'.",
+			"solution_query": "SELECT CategoryName FROM Categories WHERE CategoryName LIKE '%Beverages%'"
+		},
+		{
+			"number": 5,
+			"text": "Report total freight cost for orders placed on July 4, 1996.",
+			"solution_query": "SELECT SUM(Freight) FROM Orders WHERE OrderDate = '1996-07-04'"
+		},
+		{
+			"number": 6,
+			"text": "Report those orders with freight cost greater than $100.",
+			"solution_query": "SELECT Freight FROM Orders WHERE Freight > 100"
+		},
+		{
+			"number": 7,
+			"text": "List the products in each category.",
+			"solution_query": "SELECT CategoryID, ProductName FROM Products ORDER BY CategoryID, ProductName"
+		},
+		{
+			"number": 8,
+			"text": "How many products in each category?",
+			"solution_query": "SELECT CategoryID, COUNT(ProductID) FROM Products GROUP BY CategoryID"
+		},
+		{
+			"number": 9,
+			"text": "What is the minimum freight cost?",
+			"solution_query": "SELECT MIN(Freight) FROM Orders"
+		},
+		{
+			"number": 10,
+			"text": "List all orders with freight cost greater than twice the average freight.",
+			"solution_query": "SELECT Freight FROM Orders WHERE Freight > 2 * (SELECT AVG(Freight) FROM Orders)"
+		},
+		{
+			"number": 11,
+			"text": "What is the average unit price of all products?",
+			"solution_query": "SELECT AVG(UnitPrice) FROM Products"
+		},
+		{
+			"number": 12,
+			"text": "How many distinct products does Northwind sell?",
+			"solution_query": "SELECT COUNT(DISTINCT ProductID) FROM Products"
+		},
+		{
+			"number": 13,
+			"text": "Report the name and city of customers who don't have a region value.",
+			"solution_query": "SELECT City, CompanyName FROM Customers WHERE Region IS NULL"
+		},
+		{
+			"number": 14,
+			"text": "What are the names of employees with 'Manager' in their title? Use CONCAT to combine first and last names.",
+			"solution_query": "SELECT CONCAT(FirstName, ' ', LastName) FROM Employees WHERE Title LIKE '%Manager%'"
+		},
+		{
+			"number": 15,
+			"text": "Which orders have a total quantity greater than 50 units?",
+			"solution_query": "SELECT OrderID, SUM(Quantity) AS TotalUnits FROM [Order Details] GROUP BY OrderID HAVING SUM(Quantity) > 50"
+		}
+	]
+}

@@ -50,11 +50,8 @@ const loadReferenceData = async () => {
 					const fileContent = await fs.readFile(filePath, "utf8");
 					const data = JSON.parse(fileContent);
 
-					// Determine database prefix and type
-					const dbPrefix = file.startsWith("n_")
-						? "Northwind: "
-						: "ClassicModels: ";
-					const topicName = dbPrefix + data.title;
+					// Use the title directly from the JSON content
+					const topicName = data.title;
 					const topicType = data.type === "data model" ? "data_model" : "sql";
 
 					// Check if topic exists
@@ -81,7 +78,7 @@ const loadReferenceData = async () => {
 
 					// Create map of existing questions
 					const existingQuestionsMap = new Map(
-						topic.questions.map((q) => [q.questionNumber, q])
+						(topic.questions || []).map((q) => [q.questionNumber, q])
 					);
 
 					// Prepare bulk operations for questions

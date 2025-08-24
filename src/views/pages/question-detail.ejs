@@ -82,8 +82,24 @@ Payments (customerNumber, checkNumber, paymentDate, amount)
 Products (productCode, productName, productLine, productScale, productVendor, productDescription, quantityInStock, buyPrice, MSRP)
 ProductLines (productLine, textDescription, htmlDescription, image)
                                             </code></pre>
-                                            <% } else { %>
+                                            <% } else if (question.topic.database==='Text' ) { %>
                                                 <pre class="bg-light p-3 rounded"><code>
+shr (shrcode, shrfirm, shrprice, shrqty, shrdiv, shrpe)
+share (shrcode, shrfirm, shrprice, shrqty, shrdiv, shrpe)
+stock (stkcode, stkfirm, stkprice, stkqty, stkdiv, stkpe, natcode)
+stockvalue (stkfirm, stkprice, stkqty, exchrate, stkvalue)
+emp (empno, empfname, empsalary, deptname, bossno)
+dept (deptname, deptfloor, deptphone, empno)
+product (prodid, proddesc, prodcost, prodprice)
+sale (saleno, saledate, saletext)
+lineitem (lineno, lineqty, lineprice, saleno, itemno)
+item (itemno, itemname, itemtype, itemcolor)
+nation (natcode, natname, exchrate)
+person (personid, person first, person last)
+car (carid, carcost, carsell, cartype, personid)
+                                            </code></pre>
+                                                <% } else { %>
+                                                    <pre class="bg-light p-3 rounded"><code>
 Categories (CategoryID, CategoryName, Description, Picture)
 Customers (CustomerID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax)
 Employees (EmployeeID, LastName, FirstName, Title, TitleOfCourtesy, BirthDate, HireDate, Address, City, Region, PostalCode, Country, HomePhone, Extension, Photo, Notes, ReportsTo, PhotoPath)
@@ -96,7 +112,7 @@ Shippers (ShipperID, CompanyName, Phone)
 Suppliers (SupplierID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax, HomePage)
 Territories (TerritoryID, TerritoryDescription, RegionID)
                                             </code></pre>
-                                                <% } %>
+                                                    <% } %>
                                     </div>
                                 </div>
                             </div>
@@ -120,10 +136,11 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                     <!-- Real-time Feedback Column -->
                     <div class="col-md-4">
                         <div class="card h-100 shadow-sm">
-                            <div class="card-header bg-info text-white">
+                            <div class="card-header bg-primary text-white">
                                 <h6 class="mb-0">
                                     <i class="bi bi-robot me-2"></i>
-                                    AI Assistant
+                                    AI Assistant - Real-time Feedback
+                                    <span id="analysis-status" class="badge bg-light text-dark ms-2">Ready</span>
                                 </h6>
                             </div>
                             <div class="card-body">
@@ -138,6 +155,13 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
                                     <small class="text-muted">Analyzing your query...</small>
+                                </div>
+                                <!-- Test button for debugging -->
+                                <div class="mt-3">
+                                    <button id="test-analysis" class="btn btn-outline-secondary btn-sm">
+                                        <i class="bi bi-bug me-2"></i>
+                                        Test Analysis
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -286,6 +310,8 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
         const chatgptAnalysis = document.getElementById('chatgpt-analysis');
         const chatgptLoading = document.getElementById('chatgpt-loading');
         const chatgptContent = document.getElementById('chatgpt-content');
+        const analysisStatusBadge = document.getElementById('analysis-status');
+
 
         // Execute query button click
         executeBtn.addEventListener('click', async function () {
@@ -589,13 +615,66 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
             }
         });
 
+        // Test analysis button for debugging
+        const testAnalysisBtn = document.getElementById('test-analysis');
+        if (testAnalysisBtn) {
+            testAnalysisBtn.addEventListener('click', async function () {
+                console.log('Test analysis button clicked');
+                const testQuery = 'SELECT * FROM customers WHERE city = "NYC"';
+
+                try {
+                    realtimeLoading.style.display = 'block';
+                    realtimeFeedback.innerHTML = '';
+                    analysisStatusBadge.textContent = 'Analyzing...';
+                    analysisStatusBadge.className = 'badge bg-info';
+
+                    console.log('Sending test analysis request');
+                    const response = await fetch(`/questions/${questionId}/analyze-realtime`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ query: testQuery })
+                    });
+
+                    const result = await response.json();
+                    console.log('Test analysis response:', result);
+
+                    if (result.success) {
+                        realtimeFeedback.innerHTML = `<div class="alert alert-success"><strong>Test Query:</strong> ${testQuery}<br><br>${result.analysis}</div>`;
+                        analysisStatusBadge.textContent = 'Ready';
+                        analysisStatusBadge.className = 'badge bg-light text-dark';
+                    } else {
+                        realtimeFeedback.innerHTML = `<div class="alert alert-danger">Test failed: ${result.message || 'Unknown error'}</div>`;
+                        analysisStatusBadge.textContent = 'Failed';
+                        analysisStatusBadge.className = 'badge bg-danger';
+                    }
+                } catch (error) {
+                    console.error('Test analysis error:', error);
+                    realtimeFeedback.innerHTML = '<div class="alert alert-danger">Test analysis failed. Check console for details.</div>';
+                    analysisStatusBadge.textContent = 'Failed';
+                    analysisStatusBadge.className = 'badge bg-danger';
+                } finally {
+                    realtimeLoading.style.display = 'none';
+                }
+            });
+        }
+
         // Real-time query analysis
         let analysisTimeout;
         const realtimeFeedback = document.getElementById('realtime-feedback');
         const realtimeLoading = document.getElementById('realtime-loading');
 
+        // Debug logging
+        console.log('Real-time analysis elements:', {
+            realtimeFeedback: realtimeFeedback,
+            realtimeLoading: realtimeLoading,
+            sqlQuery: sqlQuery
+        });
+
         sqlQuery.addEventListener('input', function () {
             const query = this.value.trim();
+            //console.log('Input event fired, query:', query);
 
             // Clear previous timeout
             if (analysisTimeout) {
@@ -604,17 +683,31 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
 
             // Only analyze if query has at least 5 words
             const wordCount = query.split(/\s+/).filter(word => word.length > 0).length;
-            if (wordCount < 5) {
-                realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-robot"></i> Start typing your query to get real-time feedback...</div>';
+            //console.log('Word count:', wordCount);
+
+            if (wordCount < 3) {
+                realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-robot"></i> Type at least 3 words to get real-time feedback...</div>';
+                return;
+            }
+
+            // Also check if it looks like a SQL query
+            const sqlKeywords = ['SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP'];
+            const hasSqlKeywords = sqlKeywords.some(keyword => query.toUpperCase().includes(keyword));
+
+            if (!hasSqlKeywords) {
+                realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-robot"></i> Start typing a SQL query to get real-time feedback...</div>';
                 return;
             }
 
             // Show loading state
             realtimeLoading.style.display = 'block';
             realtimeFeedback.innerHTML = '';
+            analysisStatusBadge.textContent = 'Analyzing...';
+            analysisStatusBadge.className = 'badge bg-info';
 
             // Set a timeout to debounce the API call
             analysisTimeout = setTimeout(async () => {
+                //console.log('Sending analysis request for query:', query);
                 try {
                     const response = await fetch(`/questions/${questionId}/analyze-realtime`, {
                         method: 'POST',
@@ -625,15 +718,22 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                     });
 
                     const result = await response.json();
+                    console.log('Analysis response:', result);
 
                     if (result.success) {
                         realtimeFeedback.innerHTML = result.analysis;
+                        analysisStatusBadge.textContent = 'Ready';
+                        analysisStatusBadge.className = 'badge bg-light text-dark';
                     } else {
                         realtimeFeedback.innerHTML = `<div class="alert alert-warning">${result.message || 'Failed to analyze query'}</div>`;
+                        analysisStatusBadge.textContent = 'Failed';
+                        analysisStatusBadge.className = 'badge bg-danger';
                     }
                 } catch (error) {
                     console.error('Error analyzing query:', error);
                     realtimeFeedback.innerHTML = '<div class="alert alert-danger">Failed to analyze query. Please try again.</div>';
+                    analysisStatusBadge.textContent = 'Failed';
+                    analysisStatusBadge.className = 'badge bg-danger';
                 } finally {
                     realtimeLoading.style.display = 'none';
                 }

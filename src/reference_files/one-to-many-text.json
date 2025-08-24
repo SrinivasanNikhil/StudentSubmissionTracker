@@ -1,0 +1,43 @@
+{
+	"title": "Watson Text - Chapter 4 - One To Many",
+	"type": "sql",
+	"database": "Text",
+	"questions": [
+		{
+			"number": 1,
+			"text": "Report the value of stocks listed in Australia.",
+			"solution_query": "SELECT stkcode, stkfirm, stkprice*stkqty*exchrate FROM stock JOIN nation ON stock.natcode = nation.natcode WHERE natname = 'Australia'"
+		},
+		{
+			"number": 2,
+			"text": "Report the dividend payment of all stocks.",
+			"solution_query": "SELECT stkcode, stkfirm, stkdiv*stkqty*exchrate FROM stock JOIN nation ON stock.natcode = nation.natcode"
+		},
+		{
+			"number": 3,
+			"text": "Report the total dividend payment by nation.",
+			"solution_query": "SELECT natname, SUM(stkdiv*stkqty*exchrate) FROM stock JOIN nation ON stock.natcode = nation.natcode GROUP BY natname"
+		},
+
+		{
+			"number": 5,
+			"text": "Report the average yield by nation.",
+			"solution_query": "SELECT natname, AVG(stkdiv/stkprice*exchrate*100) FROM stock JOIN nation ON stock.natcode = nation.natcode GROUP BY natname"
+		},
+		{
+			"number": 6,
+			"text": "Report the minimum and maximum yield for each nation.",
+			"solution_query": "SELECT natname, MIN(stkdiv/stkprice*100), MAX(stkdiv/stkprice*100) FROM stock JOIN nation ON stock.natcode = nation.natcode GROUP BY natname"
+		},
+		{
+			"number": 7,
+			"text": "Report the nations where the average yield of stocks exceeds the average yield of all stocks.",
+			"solution_query": "SELECT natname, AVG(stkdiv/stkprice*100) FROM stock JOIN nation ON stock.natcode = nation.natcode GROUP BY natname HAVING AVG(stkdiv/stkprice*100) > (SELECT AVG(stkdiv/stkprice*100) FROM stock)"
+		},
+		{
+			"number": 8,
+			"text": "Find stocks where the third or fourth letter in their name is an 'm'.",
+			"solution_query": "SELECT stkfirm FROM stock WHERE stkfirm REGEXP '^(.){2}m|^(.){3}m'"
+		}
+	]
+}

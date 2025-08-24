@@ -1,0 +1,117 @@
+{
+	"title": "ClassicModels – General Queries",
+	"type": "sql",
+	"database": "ClassicModels",
+	"questions": [
+		{
+			"number": 1,
+			"text": "Who is at the top of the organization (i.e., reports to no one).",
+			"solution_query": "SELECT * FROM Employees WHERE reportsTo IS NULL"
+		},
+		{
+			"number": 2,
+			"text": "Who reports to William Patterson?",
+			"solution_query": "SELECT reports.firstname, reports.lastname FROM Employees boss JOIN Employees reports ON boss.employeeNumber = reports.reportsTo WHERE boss.firstName = \"William\" and boss.lastName = \"Patterson\""
+		},
+		{
+			"number": 3,
+			"text": "List all the products purchased by Herkku Gifts.",
+			"solution_query": "SELECT productName FROM OrderDetails JOIN Orders ON OrderDetails.orderNumber =Orders.orderNumber JOIN Customers ON Orders.customerNumber =Customers.customerNumber JOIN Products ON Products.productCode = OrderDetails.productCode WHERE customerName = 'Herkku Gifts'"
+		},
+		{
+			"number": 4,
+			"text": "Compute the commission for each sales representative, assuming the commission is 5% of the value of an order. Sort by employee last name and first name.",
+			"solution_query": "SELECT CONCAT(firstName, ' ',lastName) AS Name, FORMAT(.05 *SUM(quantityOrdered * priceEach),0) AS Commission FROM Employees JOIN Customers ON Employees.employeeNumber = Customers.salesRepEmployeeNumber JOIN Orders ON Customers.customerNumber =Orders.customerNumber JOIN OrderDetails ON Orders.orderNumber =OrderDetails.orderNumber GROUP BY employeeNumber ORDER BY lastName, firstName ASC"
+		},
+		{
+			"number": 5,
+			"text": "What is the difference in days between the most recent and oldest order date in the Orders file?",
+			"solution_query": "SELECT DATEDIFF(MAX(orderDate), MIN(orderDate)) FROM Orders"
+		},
+		{
+			"number": 6,
+			"text": "Compute the average time between order date and ship date for each customer ordered by the largest difference.",
+			"solution_query": "SELECT customerName, AVG(DATEDIFF(shippedDate,orderDate))AS diff FROM Customers JOIN Orders ON Customers.customerNumber = Orders.customerNumber GROUP BY customerName ORDER BY diff DESC"
+		},
+		{
+			"number": 7,
+			"text": "What is the value of orders shipped in August 2004? (Hint).",
+			"solution_query": "SELECT FORMAT(SUM(quantityOrdered*priceEach),0) as orderValue FROM Orders JOIN OrderDetails ON Orders.orderNumber = OrderDetails. orderNumber WHERE YEAR(orderDate) = 2004 AND MONTH(orderDate) = 8"
+		},
+		{
+			"number": 8,
+			"text": "List the employees who report to those employees who report to DianeMurphy. Use the CONCAT function to combine the employee's firstname and last name into a single field for reporting.",
+			"solution_query": "SELECT CONCAT(firstName, ' ', lastName) from Employees WHERE reportsTo IN(SELECT employeeNumber FROM Employees WHERE reportsTo =(SELECT employeeNumber FROM Employees WHERE firstName = 'Diane' AND lastName = 'Murphy'))"
+		},
+		{
+			"number": 9,
+			"text": "What is the percentage value of each product in inventory sorted by thehighest percentage first.",
+			"solution_query": "SELECT productName, format(quantityInStock*buyPrice,0) AS Stock, format(quantityInStock*buyPrice/(totalValue)*100,2) AS Percent FROM Products, (SELECT SUM(quantityInStock*buyPrice) AS totalValue FROM Products) AS T ORDER BY quantityInStock*buyPrice/(totalValue)*100 DESC"
+		},
+		{
+			"number": 10,
+			"text": "What is the value of orders shipped in August 2004? (Hint).",
+			"solution_query": "SELECT FORMAT(SUM(quantityOrdered*priceEach),0) as orderValue FROM Orders JOIN OrderDetails ON Orders.orderNumber = OrderDetails. orderNumber WHERE YEAR(orderDate) = 2004 AND MONTH(orderDate) = 8"
+		},
+		{
+			"number": 11,
+			"text": "What is the ratio the value of payments made to orders received for each month of 2004. (i.e., divide the value of payments made by the orders received)?",
+			"solution_query": "SELECT t1.period, FORMAT(payments/orders,2) AS ratio FROM (SELECT MONTH(paymentDate) AS period, sum(amount) AS payments FROM Payments WHERE YEAR(paymentDate) = 2004 GROUP BY MONTH(paymentDate)) AS t1 JOIN(SELECT MONTH(orderDate) AS period, sum(quantityOrdered*priceEach) AS orders FROM Orders, OrderDetails WHERE Orders.orderNumber = OrderDetails.orderNumber AND YEAR(orderDate) = 2004 GROUP BY MONTH(orderDate)) AS t2 ON t1.period = t2.period"
+		},
+		{
+			"number": 12,
+			"text": "What is the difference in the amount received for each month of 2004 compared to 2003?",
+			"solution_query": "SELECT t2003.month,format((t2004.amount - t2003.amount),2) AS variance FROM (SELECT YEAR(paymentDate) AS 'year', MONTH(paymentDate) AS 'month', sum(amount) AS amount FROM Payments WHERE YEAR(paymentDate) = 2003 GROUP BY YEAR(paymentDate), MONTH(paymentDate)) AS t2003 JOIN (SELECT YEAR(paymentDate) AS 'year', MONTH(paymentDate) AS 'month', sum(amount) AS amount FROM Payments WHERE YEAR(paymentDate) = 2004 GROUP BY YEAR(paymentDate), MONTH(paymentDate)) AS t2004 ON t2003.month = t2004.month ORDER BY t2003.month"
+		},
+		{
+			"number": 13,
+			"text": "ABC reporting: Compute the revenue generated by each customer based on their orders. Also, show each customer's revenue as a percentage of total revenue. Sort by customer name. This is often called ABC reporting because some companies recognize the first 10% by revenue as A, the next 20% as B, and the rest as C, or some other variation on percentage.",
+			"solution_query": "SELECT customerName, FORMAT(SUM(quantityOrdered*priceEach),0) AS Revenue, FORMAT(SUM(quantityOrdered*priceEach)/(SELECTSUM(quantityOrdered*priceEach) FROM Customers JOIN Orders ON Customers.customerNumber = Orders.customerNumber JOIN OrderDetails ON Orders.orderNumber = OrderDetails.orderNumber)*100,2) AS Percent FROM Customers JOIN Orders ON Customers.customerNumber = Orders.customerNumber JOIN OrderDetails ON Orders.orderNumber = OrderDetails.orderNumber GROUP BY customerName ORDER BY customerName"
+		},
+		{
+			"number": 14,
+			"text": "Compute the profit generated by each customer based on their orders. Also, show each customer's profit as a percentage of total profit. Sort by profit descending.",
+			"solution_query": "SELECT customerName, FORMAT(SUM(quantityOrdered*(priceEach-buyPrice)),0) AS Profit, FORMAT(SUM(quantityOrdered*(priceEach-buyPrice))/(SELECT SUM(quantityOrdered*(priceEach-buyPrice)) FROM Customers JOIN Orders ON Customers.customerNumber = Orders.customerNumber JOIN OrderDetails ON Orders.orderNumber =OrderDetails.orderNumber JOIN Products ON Products.productCode =OrderDetails.productCode)*100,2) AS Percent FROM Customers JOIN Orders ON Customers.customerNumber = Orders.customerNumber JOIN OrderDetails ON Orders.orderNumber =OrderDetails.orderNumber GROUP BY customerName ORDER BY Percent DESC"
+		},
+		{
+			"number": 15,
+			"text": "Compute the revenue generated by each sales representative based onthe orders from the customers they serve.",
+			"solution_query": "SELECT concat(firstName, \" \", lastName) AS `Sales Representative`, FORMAT(SUM(quantityOrdered*priceEach),0) AS Revenue FROM Employees JOIN Customers ON Employees.employeeNumber =Customers.salesRepEmployeeNumber JOIN Orders ON Customers.customerNumber = Orders.customerNumber JOIN OrderDetails ON Orders.orderNumber = OrderDetails.orderNumber GROUP BY `Sales Representative`"
+		},
+		{
+			"number": 16,
+			"text": "Compute the profit generated by each sales representative based on the orders from the customers they serve. Sort by profit generated descending.",
+			"solution_query": "SELECT concat(firstName, \" \", lastName) AS `Sales Representative`, FORMAT(SUM(quantityOrdered*(priceEach - buyPrice)),0) AS Profit FROM Employees JOIN Customers ON Employees.employeeNumber =Customers.salesRepEmployeeNumber JOIN Orders ON Customers.customerNumber =Orders.customerNumber JOIN OrderDetails ON Orders.orderNumber =OrderDetails.orderNumber JOIN Products ON Products.ProductCode = OrderDetails.ProductCode GROUP BY `Sales Representative` ORDER BY SUM(quantityOrdered*(priceEach - buyPrice)) DESC"
+		},
+		{
+			"number": 17,
+			"text": "Compute the revenue generated by each product, sorted by product name.",
+			"solution_query": "SELECT productName AS Product, FORMAT(SUM(quantityOrdered*priceEach),0) AS Revenue FROM Products JOIN OrderDetails ON Products.productCode = OrderDetails.productCode GROUP BY productName ORDER BY productName"
+		},
+		{
+			"number": 18,
+			"text": "Compute the profit generated by each product line, sorted by profit descending",
+			"solution_query": "SELECT productLine AS `Product line`, FORMAT(SUM(quantityOrdered*(priceEach -buyPrice)),0) AS Profit FROM Products JOIN OrderDetails ON Products.productCode = OrderDetails.productCode GROUP BY productLine ORDER BY SUM(quantityOrdered*(priceEach - buyPrice)) DESC"
+		},
+		{
+			"number": 19,
+			"text": "Same as Last Year (SALY) analysis: Compute the ratio for each product of sales for 2003 versus 2004",
+			"solution_query": "SELECT productName, format(t2003.OrderValue,0) AS Y2003,format(t2004.OrderValue,0) AS Y2004, FORMAT(t2004.OrderValue/t2003.OrderValue,2) as Ratio FROM(SELECT productName, Products.productCode, sum(quantityOrdered*priceEach) AS OrderValue FROM Orders JOIN OrderDetails ON Orders.`orderNumber` = OrderDetails.`orderNumber` JOIN Products ON OrderDetails.productCode = Products.productCode WHERE YEAR(orderDate) = 2003 GROUP BY Products.productCode) as t2003 JOIN(SELECT Products.productCode, sum(quantityOrdered*priceEach) AS OrderValue FROM Orders JOIN OrderDetails ON Orders.`orderNumber` = OrderDetails.`orderNumber` JOIN Products ON OrderDetails.productCode = Products.productCode WHERE YEAR(orderDate) = 2004 GROUP BY Products.productCode) AS t2004 ON t2003.productCode = t2004.productCodeORDER BY t2004.OrderValue/t2003.OrderValue DESC"
+		},
+		{
+			"number": 20,
+			"text": "Compute the ratio of payments for each customer for 2003 versus 2004",
+			"solution_query": "SELECT t2003.customerName as `Customer name`, format(t2003.Payments,0) as Y2003, format(t2004.Payments,0) asY2004, FORMAT(t2004.Payments/t2003.Payments,2) as Ratio FROM(SELECT customerName, Customers.customerNumber, sum(amount) as Payments FROM Customers JOIN Payments ON Customers.`customerNumber` = Payments.customerNumber WHERE YEAR(paymentDate) = 2003 GROUP BY Customers.customerNumber) as t2003 JOIN(SELECT customerName, Customers.customerNumber, sum(amount) asPayments FROM Customers JOIN Payments ON Customers.`customerNumber` = Payments.customerNumber WHERE YEAR(paymentDate) = 2004 GROUP BY Customers.customerNumber) as t2004 ON t2003.customerNumber = t2004.customerNumberorder by t2004.Payments/t2003.Payments DESC"
+		},
+		{
+			"number": 21,
+			"text": "Find the products sold in 2003 but not 2004.",
+			"solution_query": "SELECT productName FROM Products JOIN OrderDetails ON Products.productCode =OrderDetails.productCode JOIN Orders ON Orders.orderNumber = OrderDetails.orderNumber WHERE YEAR(orderDate) = 2003AND Products.productCode NOT IN (SELECT Products.productCode FROM Products JOIN OrderDetails ON Products.productCode =OrderDetails.productCode JOIN Orders ON Orders.orderNumber = OrderDetails.orderNumber WHERE YEAR(orderDate) = 2004)"
+		},
+		{
+			"number": 22,
+			"text": "Find the customers without payments in 2003.",
+			"solution_query": "SELECT DISTINCT customerName as `Customer name` FROMCustomers JOIN Payments ON Customers.customerNumber =Payments.customerNumber WHERE customerName NOT IN (SELECT customerName FROM Customers JOIN Payments ON Customers.customerNumber =Payments.customerNumber WHERE YEAR(`paymentDate`) = 2003)"
+		}
+	]
+}

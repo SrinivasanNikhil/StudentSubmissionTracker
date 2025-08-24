@@ -47,6 +47,29 @@ const northwindDB = new Sequelize({
 	},
 });
 
+// Text database connection (same server, different database)
+const textDB = new Sequelize({
+	dialect: "mysql",
+	host: process.env.DB_HOST,
+	port: process.env.DB_PORT,
+	username: process.env.DB_USER,
+	password: process.env.DB_PASSWORD,
+	database: "Text",
+	logging: process.env.NODE_ENV === "development" ? console.log : false,
+	pool: {
+		max: 5,
+		min: 0,
+		acquire: 30000,
+		idle: 10000,
+	},
+	define: {
+		charset: "utf8mb4",
+		collate: "utf8mb4_unicode_ci",
+		timestamps: true,
+		underscored: true,
+	},
+});
+
 // MySQL connection for application data (users, completions, etc.)
 const appDB = new Sequelize({
 	dialect: "mysql",
@@ -153,6 +176,7 @@ module.exports = {
 	sequelize: appDB,
 	classicModelsDB,
 	northwindDB,
+	textDB,
 	testConnection,
 	initializeDatabase,
 };

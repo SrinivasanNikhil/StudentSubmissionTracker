@@ -1,0 +1,87 @@
+{
+	"title": "Watson Text - Chapter 3 - Single Entity",
+	"type": "sql",
+	"database": "Text",
+	"questions": [
+		{
+			"number": 1,
+			"text": "List a share’s name and its code.",
+			"solution_query": "SELECT shrfirm, shrcode FROM shr"
+		},
+		{
+			"number": 2,
+			"text": "List full details for all shares with a price less than $1.",
+			"solution_query": "SELECT * FROM shr WHERE shrprice < 1.00"
+		},
+		{
+			"number": 3,
+			"text": "List the names and prices of all shares with a price of at least $10.",
+			"solution_query": "SELECT shrfirm, shrprice FROM shr WHERE shrprice >= 10.00"
+		},
+		{
+			"number": 4,
+			"text": "Create a report showing firm name, share price, share holding, and total value of shares held. (Value of shares held is price times quantity.)",
+			"solution_query": "SELECT shrfirm, shrprice, shrqty, shrqty*shrprice FROM shr"
+		},
+		{
+			"number": 5,
+			"text": "List the names of all shares with a yield exceeding 5 percent.",
+			"solution_query": "SELECT shrfirm, shrdiv/shrprice*100 FROM shr WHERE shrdiv/shrprice*100 > 5"
+		},
+		{
+			"number": 6,
+			"text": "Report the total dividend payment of Patagonian Tea. (The total dividend payment is dividend times quantity.)",
+			"solution_query": "SELECT shrdiv*shrqty FROM shr WHERE shrfirm = 'Patagonian Tea'"
+		},
+		{
+			"number": 7,
+			"text": "Find all shares where the price is less than 20 times the dividend.",
+			"solution_query": "SELECT shrcode, shrfirm FROM shr WHERE shrprice < 20*shrdiv"
+		},
+		{
+			"number": 8,
+			"text": "Find the share(s) with the minimum yield.",
+			"solution_query": "SELECT shrcode, shrfirm, shrdiv/shrprice*100 FROM shr WHERE shrdiv/shrprice = (SELECT MIN(shrdiv/shrprice) FROM shr)"
+		},
+		{
+			"number": 9,
+			"text": "Find the total value of all shares with a PE ratio > 10.",
+			"solution_query": "SELECT SUM (shrprice*shrqty) FROM shr WHERE shrpe > 10"
+		},
+		{
+			"number": 10,
+			"text": "Find the share(s) with the maximum total dividend payment.",
+			"solution_query": "SELECT shrcode, shrfirm FROM shr WHERE shrdiv*shrqty = (SELECT MAX(shrdiv*shrqty) FROM shr)"
+		},
+		{
+			"number": 11,
+			"text": "Find the value of the holdings in Abyssinian Ruby and Sri Lankan Gold.",
+			"solution_query": "SELECT shrfirm, shrprice*shrqty FROM shr WHERE shrfirm IN ('Abyssinian Ruby', 'Sri Lankan Gold')"
+		},
+		{
+			"number": 12,
+			"text": "Find the yield of all firms except Bolivian Sheep and Canadian Sugar.",
+			"solution_query": "SELECT shrcode, shrfirm, shrdiv/shrprice*100 FROM shr WHERE shrfirm NOT IN ('Bolivian Sheep', 'Canadian Sugar')"
+		},
+		{
+			"number": 13,
+			"text": "Find the total value of the portfolio.",
+			"solution_query": "SELECT SUM (shrprice*shrqty) FROM shr"
+		},
+		{
+			"number": 14,
+			"text": "List firm name and value in descending order of value.",
+			"solution_query": "SELECT shrfirm, shrprice*shrqty FROM shr ORDER BY shrprice*shrqty DESC"
+		},
+		{
+			"number": 15,
+			"text": "List shares with a firm name containing “Gold.”",
+			"solution_query": "SELECT shrcode,shrfirm FROM shr WHERE shrfirm REGEXP 'Gold'"
+		},
+		{
+			"number": 16,
+			"text": "Find shares with a code starting with “B.”",
+			"solution_query": "SELECT shrcode, shrfirm FROM shr WHERE shrcode REGEXP '^B'"
+		}
+	]
+}

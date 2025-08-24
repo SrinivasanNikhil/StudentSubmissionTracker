@@ -1,5 +1,5 @@
 {
-	"title": "Join, Group By and Having",
+	"title": "Northwind - Join, Group By and Having",
 	"type": "sql",
 	"database": "Northwind",
 	"questions": [

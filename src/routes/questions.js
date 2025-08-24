@@ -166,11 +166,16 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 		if (result.success && question.solution) {
 			comparison = await compareQueries(query, question.solution, databaseName);
 
-			// Check if the student query returns the same number of rows as the reference query
+			// Check if the student query matches BOTH rows AND columns
+			// Also ensure the comparison object has all required properties for safety
 			if (
+				comparison &&
+				comparison.success &&
 				comparison.studentResult &&
 				comparison.solutionResult &&
-				comparison.studentResult.rows === comparison.solutionResult.rows
+				comparison.rowsMatch && // Rows must match
+				comparison.columnsMatch && // Column count must match
+				comparison.columnNamesMatch // Column names must match
 			) {
 				// Check if the user has already completed this question
 				const existingCompletion = await Completion.findOne({
@@ -197,9 +202,27 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 							user.semester || InstructorCourseSection.getCurrentSemester(),
 						courseSection: user.courseSection,
 					});
+
+					console.log(
+						`✅ Question ${id} marked as completed for user ${userId} - All criteria met (rows, columns, column names)`
+					);
+				} else {
+					console.log(`ℹ️ Question ${id} already completed for user ${userId}`);
 				}
 
 				isCompleted = true;
+			} else if (comparison && comparison.success) {
+				// Log why the question was not completed
+				const reasons = [];
+				if (!comparison.rowsMatch) reasons.push("row count mismatch");
+				if (!comparison.columnsMatch) reasons.push("column count mismatch");
+				if (!comparison.columnNamesMatch) reasons.push("column names mismatch");
+
+				console.log(
+					`❌ Question ${id} NOT completed for user ${userId} - Reasons: ${reasons.join(
+						", "
+					)}`
+				);
 			}
 		}
 
@@ -298,10 +321,15 @@ Format your response in a clear, structured way using HTML formatting.`;
 // Real-time query analysis
 router.post("/:id/analyze-realtime", isAuthenticated, async (req, res) => {
 	try {
+		console.log("🔍 Real-time analysis request received");
 		const { query } = req.body;
 		const { id } = req.params;
+		const userId = req.session.userId;
+
+		console.log("Request details:", { id, userId, query });
 
 		if (!query || query.trim() === "") {
+			console.log("❌ No query provided");
 			return res.status(400).json({
 				success: false,
 				message: "SQL query is required",
@@ -314,11 +342,14 @@ router.post("/:id/analyze-realtime", isAuthenticated, async (req, res) => {
 		});
 
 		if (!question) {
+			console.log("❌ Question not found:", id);
 			return res.status(404).json({
 				success: false,
 				message: "Question not found",
 			});
 		}
+
+		console.log("✅ Question found:", question.questionText);
 
 		// Create a prompt for ChatGPT
 		const prompt = `You are an MySQL tutor helping a student write a query for the following question:
@@ -334,6 +365,8 @@ Provide real-time feedback on:
 
 Keep the response concise (max 100 words) and focus on immediate, actionable feedback. Do not provide any type of actual solution or code.
 Format the response in HTML with appropriate styling.`;
+
+		console.log("🤖 Sending request to OpenAI...");
 
 		// Get analysis from ChatGPT
 		const completion = await openai.chat.completions.create({
@@ -354,13 +387,14 @@ Format the response in HTML with appropriate styling.`;
 		});
 
 		const analysis = completion.choices[0].message.content;
+		console.log("✅ OpenAI analysis received, length:", analysis.length);
 
 		return res.json({
 			success: true,
 			analysis: analysis,
 		});
 	} catch (error) {
-		console.error("Error analyzing query:", error);
+		console.error("❌ Error analyzing query:", error);
 		return res.status(500).json({
 			success: false,
 			message: "Error analyzing query",

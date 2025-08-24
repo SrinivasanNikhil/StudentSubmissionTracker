@@ -1,0 +1,77 @@
+{
+  "title": "Watson Text - Chapter 6  - One to One and Recursive",
+  "type": "sql",
+  "database": "Text",
+  "questions": [
+    {
+      "number": 1,
+      "text": "Find the departments where all the employees earn less than their boss.",
+      "solution_query": "WITH wrk as (SELECT * FROM emp), boss as (SELECT * FROM emp) SELECT DISTINCT (deptname) FROM dept WHERE deptname NOT IN (SELECT wrk.deptname FROM wrk JOIN boss ON wrk.bossno = boss.empno WHERE wrk.empsalary > boss.empsalary)"
+    },
+    {
+      "number": 2,
+      "text": "Find the names of employees who are in the same department as their boss (as an employee).",
+      "solution_query": "WITH wrk as (SELECT * FROM emp), boss as (SELECT * FROM emp) SELECT wrk.empfname FROM wrk JOIN boss ON wrk.bossno = boss.empno WHERE wrk.deptname = boss.deptname"
+    },
+    {
+      "number": 3,
+      "text": "List the departments having an average salary greater than $25,000.",
+      "solution_query": "SELECT deptname, AVG(empsalary) FROM emp GROUP BY deptname HAVING AVG(empsalary) > 25000"
+    },
+    {
+      "number": 4,
+      "text": "List the departments where the average salary of the employees, excluding the boss, is greater than $25,000.",
+      "solution_query": "SELECT deptname, AVG(empsalary) FROM emp WHERE empno NOT IN (SELECT empno FROM dept) GROUP BY deptname HAVING AVG(empsalary) > 25000"
+    },
+    {
+      "number": 5,
+      "text": "List the names and manager of the employees of the Marketing department who have a salary greater than $25,000.",
+      "solution_query": "WITH wrk as (SELECT * FROM emp), boss as (SELECT * FROM emp) SELECT wrk.empfname, boss.empfname FROM wrk JOIN boss ON wrk.bossno = boss.empno WHERE wrk.deptname = 'Marketing' AND wrk.empsalary > 25000"
+    },
+    {
+      "number": 6,
+      "text": "List the names of the employees who earn more than any employee in the Marketing department.",
+      "solution_query": "SELECT empfname FROM emp WHERE empsalary > (SELECT MAX(empsalary) FROM emp WHERE deptname = 'Marketing')"
+    },
+    {
+      "number": 7,
+      "text": "Who succeeded Victoria I?",
+      "solution_query": "SELECT monname, monnum FROM monarch WHERE premonname = 'Victoria' AND premonnum = 'I'"
+    },
+    {
+      "number": 8,
+      "text": "How many days did Victoria I reign?",
+      "solution_query": "WITH suc as (SELECT * FROM monarch), cur as (SELECT * FROM monarch) SELECT suc.rgnbeg - cur.rgnbeg AS \"days\" FROM cur JOIN suc ON (suc.premonname = cur.monname AND suc.premonnum = cur.monnum) WHERE cur.monname = 'Victoria' AND cur.monnum = 'I'"
+    },
+    {
+      "number": 9,
+      "text": "How many kings are there in the table?",
+      "solution_query": "SELECT COUNT(montype) FROM monarch WHERE montype = 'King'"
+    },
+    {
+      "number": 10,
+      "text": "Which monarch had the shortest reign?",
+      "solution_query": "WITH cur as (SELECT * FROM monarch), pre as (SELECT * FROM monarch) SELECT pre.montype, pre.monname, pre.monnum, (cur.rgnbeg - pre.rgnbeg) as \"days\" FROM cur JOIN pre ON (cur.premonname = pre.monname AND cur.premonnum = pre.monnum) WHERE (cur.rgnbeg - pre.rgnbeg) = (SELECT MIN(cur.rgnbeg - pre.rgnbeg) FROM monarch AS cur JOIN monarch AS pre ON (cur.premonname = pre.monname AND cur.premonnum = pre.monnum))"
+    },
+    {
+      "number": 11,
+      "text": "How many different items are there in the animal photography kit?",
+      "solution_query": "SELECT COUNT(*) FROM product JOIN assembly ON product.prodid = assembly.prodid WHERE proddesc = 'Animal photography kit'"
+    },
+    {
+      "number": 12,
+      "text": "What is the most expensive item in the animal photography kit?",
+      "solution_query": "SELECT proddesc FROM product WHERE prodprice = (SELECT MAX(prodprice) FROM product WHERE prodid IN (SELECT subprodid FROM product JOIN assembly ON product.prodid = assembly.prodid WHERE proddesc = 'Animal photography kit'))"
+    },
+    {
+      "number": 13,
+      "text": "What is the total cost of the components of the animal photography kit?",
+      "solution_query": "SELECT SUM(PRODCOST*quantity) AS 'Total cost' FROM product JOIN assembly ON product.prodid = assembly.subprodid WHERE product.prodid IN (SELECT subprodid FROM product JOIN assembly ON product.prodid = assembly.prodid WHERE proddesc = 'Animal photography kit')"
+    },
+    {
+      "number": 14,
+      "text": "Compute the total quantity for each of the items required to assemble 15 animal photography kits.",
+      "solution_query": "SELECT 15*SUM(quantity) AS Quantity FROM product JOIN assembly ON product.prodid = assembly.subprodid WHERE product.prodid IN (SELECT subprodid FROM product JOIN assembly ON product.prodid = assembly.prodid WHERE proddesc = 'Animal photography kit')"
+    }
+  ]
+}

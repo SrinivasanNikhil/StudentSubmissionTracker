@@ -1,0 +1,62 @@
+{
+	"title": "ClassicModels – REGEXP Problems",
+	"type": "sql",
+	"database": "ClassicModels",
+	"questions": [
+		{
+			"number": 1,
+			"text": "Find products containing the name 'Ford'.",
+			"solution_query": "SELECT * FROM Products WHERE productName REGEXP 'Ford'"
+		},
+		{
+			"number": 2,
+			"text": "List products ending in 'ship'.",
+			"solution_query": "SELECT * FROM Products WHERE productName REGEXP '[Ss]hip$'"
+		},
+		{
+			"number": 3,
+			"text": "Report the number of customers in Denmark, Norway, and Sweden.",
+			"solution_query": "SELECT country, COUNT(*) FROM Customers WHERE country REGEXP 'Denmark|Norway|Sweden' GROUP BY country"
+		},
+		{
+			"number": 4,
+			"text": "What are the products with a product code in the range S700_1000 toS700_1499?",
+			"solution_query": "SELECT * FROM Products WHERE productCode REGEXP 'S700_1[0-4][0-9]{2}'"
+		},
+		{
+			"number": 5,
+			"text": "Which customers have a digit in their name?",
+			"solution_query": "SELECT * FROM Customers WHERE customerName REGEXP '[0-9]'"
+		},
+		{
+			"number": 6,
+			"text": "List the names of employees called Dianne or Diane.",
+			"solution_query": "SELECT * FROM Employees WHERE firstName REGEXP 'Dian'"
+		},
+		{
+			"number": 7,
+			"text": "List the products containing ship or boat in their product name.",
+			"solution_query": "SELECT * FROM Products WHERE productName REGEXP 'ship|boat|Ship|Boat'"
+		},
+		{
+			"number": 8,
+			"text": "List the products with a product code beginning with S700.",
+			"solution_query": "SELECT * FROM Products WHERE productCode REGEXP '^S700' "
+		},
+		{
+			"number": 9,
+			"text": "List the names of employees called Larry or Barry.",
+			"solution_query": "SELECT * FROM Employees WHERE firstName REGEXP '[BL]array'"
+		},
+		{
+			"number": 10,
+			"text": "List the names of employees with non-alphabetic characters in their names.",
+			"solution_query": "SELECT * FROM Employees WHERE firstName REGEXP '[^a-z|A-Z]'"
+		},
+		{
+			"number": 11,
+			"text": "List the vendors whose name ends in Diecast",
+			"solution_query": "SELECT DISTINCT(productVendor) FROM Products WHERE productVendor REGEXP 'Diecast$'"
+		}
+	]
+}

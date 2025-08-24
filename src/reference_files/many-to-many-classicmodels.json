@@ -1,0 +1,57 @@
+{
+	"title": "ClassicModels - Many To Many",
+	"type": "sql",
+	"database": "ClassicModels",
+	"questions": [
+		{
+			"number": 1,
+			"text": "Report the account representative for each customer.",
+			"solution_query": "SELECT customerName, firstName, lastNameFROM Customers JOIN EmployeesON Employees.employeeNumber =Customers.salesRepEmployeeNumber"
+		},
+		{
+			"number": 2,
+			"text": "Report total payments for Atelier graphique.",
+			"solution_query": "SELECT SUM(amount)FROM Payments JOIN CustomersON Customers.customerNumber = Payments.customerNumber WHERE customerName = 'Atelier graphique'"
+		},
+		{
+			"number": 3,
+			"text": "Report the total payments by date",
+			"solution_query": "SELECT paymentDate, SUM(amount)FROM PaymentsGROUP BY paymentDate"
+		},
+		{
+			"number": 4,
+			"text": "Report the products that have not been sold.",
+			"solution_query": "SELECT productName, Products.productCodeFROM ProductsWHERE NOT EXISTS (SELECT * FROM OrderDetails WHEREOrderDetails.productCode = Products.productCode)"
+		},
+		{
+			"number": 5,
+			"text": "List the amount paid by each customer.",
+			"solution_query": "SELECT customerName, SUM(amount)FROM Payments JOIN CustomersON Payments.customerNumber = Customers.customerNumberGROUP BY customerName"
+		},
+		{
+			"number": 6,
+			"text": "How many orders have been placed by Herkku Gifts?",
+			"solution_query": "SELECT COUNT(orderNumber)FROM Orders JOIN CustomersON Orders.customerNumber = Customers.customerNumber AND customerName = 'Herkku Gifts'"
+		},
+		{
+			"number": 7,
+			"text": "Who are the employees in Boston?",
+			"solution_query": "SELECT firstName, lastNameFROM Employees JOIN OfficesON Employees.officeCode = Offices.officeCodeAND city = 'Boston'"
+		},
+		{
+			"number": 8,
+			"text": "Report those payments greater than $100,000. Sort the report so thecustomer who made the highest payment appears first.",
+			"solution_query": "SELECT customerNumber, amountFROM PaymentsWHERE amount > 100000ORDER BY amount DESC"
+		},
+		{
+			"number": 9,
+			"text": "List the value of 'On Hold' orders.",
+			"solution_query": "SELECT SUM(quantityOrdered * priceEach) AS ValueFROM OrderDetails JOIN OrdersON Orders.orderNumber = OrderDetails.orderNumberWHERE status = 'On Hold'"
+		},
+		{
+			"number": 10,
+			"text": "Report the number of orders 'On Hold' for each customer.",
+			"solution_query": "SELECT customerName, COUNT(orderNumber)FROM Orders JOIN CustomersON Orders.customerNumber = Customers.customerNumberWHERE status = 'On Hold'GROUP BY customerName"
+		}
+	]
+}

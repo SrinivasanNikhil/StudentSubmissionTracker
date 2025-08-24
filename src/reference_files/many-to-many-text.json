@@ -1,0 +1,32 @@
+{
+	"title": "Watson Text - Chapter 5 - Many To Many",
+	"type": "sql",
+	"database": "Text",
+	"questions": [
+		{
+			"number": 1,
+			"text": "List the names of items for which the quantity sold is greater than one for any sale.",
+			"solution_query": "SELECT itemname FROM item JOIN lineitem ON item.itemno = lineitem.itemno WHERE lineqty > 1"
+		},
+		{
+			"number": 2,
+			"text": "Compute the total value of sales for each item by date.",
+			"solution_query": "SELECT itemname, saledate, SUM(lineqty*lineprice) FROM item JOIN lineitem ON item.itemno = lineitem.itemno JOIN sale ON sale.saleno = lineitem.salemno GROUP BY itemname, saledate"
+		},
+		{
+			"number": 3,
+			"text": "Report all items of type “F” that have been sold.",
+			"solution_query": "SELECT itemname FROM item WHERE itemtype = 'F' AND EXISTS (SELECT * FROM lineitem WHERE lineitem.itemno = item.itemno);"
+		},
+		{
+			"number": 4,
+			"text": "List all items of type “F” that have not been sold.",
+			"solution_query": "SELECT DISTINCT(itemname) FROM item WHERE itemtype = 'F' AND NOT EXISTS (SELECT * FROM lineitem WHERE item.itemno = lineitem.itemno);"
+		},
+		{
+			"number": 5,
+			"text": "Compute the total value of each sale",
+			"solution_query": "SELECT saleno, SUM(lineqty * lineprice) FROM lineitem GROUP BY saleno"
+		}
+	]
+}

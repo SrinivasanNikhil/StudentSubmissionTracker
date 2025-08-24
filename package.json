@@ -7,7 +7,12 @@
 		"dev": "nodemon src/server.js",
 		"test": "jest --watchAll",
 		"create-db": "node src/config/create-db.js",
-		"init-db": "npm run create-db && node src/config/init-db.js"
+		"init-db": "npm run create-db && node src/config/init-db.js",
+		"cleanup-and-recreate": "node src/scripts/cleanup-and-recreate-topics.js",
+		"inspect-text-db": "node src/scripts/inspect-text-db-schema.js",
+		"test-completion": "node src/scripts/test-completion-logic.js",
+		"test-analyze": "node src/scripts/test-analyze-realtime.js",
+		"test-column-matching": "node src/scripts/test-column-matching.js"
 	},
 	"keywords": [],
 	"author": "",
