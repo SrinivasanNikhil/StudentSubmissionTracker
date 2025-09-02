@@ -391,7 +391,7 @@ router.post("/:id/analyze-realtime", isAuthenticated, async (req, res) => {
 		console.log("✅ Question found:", question.questionText);
 
 		// Create a prompt for ChatGPT
-		const prompt = `You are an MySQL tutor helping a student write a query for the following question:
+		const prompt = `You are a terse MySQL TA helping a student for the following question:
 
 Question: ${question.questionText}
 
@@ -400,9 +400,8 @@ ${query}
 
 Provide real-time feedback on:
 1. Syntax correctness
-2. Common mistakes to avoid
 
-Keep the response concise (max 100 words) and focus on immediate, actionable feedback. Do not provide any type of actual solution or code.
+Keep the response to 100 words, focus on immediate, actionable feedback, no solution, no code.
 Format the response in HTML with appropriate styling.`;
 
 		console.log("🤖 Sending request to OpenAI...");
@@ -421,8 +420,8 @@ Format the response in HTML with appropriate styling.`;
 					content: prompt,
 				},
 			],
-			temperature: 0.7,
-			max_tokens: 200,
+			temperature: 0.35,
+			max_tokens: 128,
 		});
 
 		const analysis = completion.choices[0].message.content;
