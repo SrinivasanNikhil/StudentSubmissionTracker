@@ -318,15 +318,21 @@ Format your response in a clear, structured way using HTML formatting.`;
 	}
 });
 
-// Real-time query analysis
+// Real-time query analysis with rate limiting and change detection
 router.post("/:id/analyze-realtime", isAuthenticated, async (req, res) => {
 	try {
 		console.log("🔍 Real-time analysis request received");
-		const { query } = req.body;
+		const { query, previousQuery, lastAnalysisTime } = req.body;
 		const { id } = req.params;
 		const userId = req.session.userId;
 
-		console.log("Request details:", { id, userId, query });
+		console.log("Request details:", {
+			id,
+			userId,
+			query,
+			previousQuery,
+			lastAnalysisTime,
+		});
 
 		if (!query || query.trim() === "") {
 			console.log("❌ No query provided");
@@ -334,6 +340,39 @@ router.post("/:id/analyze-realtime", isAuthenticated, async (req, res) => {
 				success: false,
 				message: "SQL query is required",
 			});
+		}
+
+		// Rate limiting: Check if enough time has passed since last analysis
+		const now = Date.now();
+		const minTimeBetweenCalls = 30000; // 30 seconds minimum between calls
+
+		if (lastAnalysisTime && now - lastAnalysisTime < minTimeBetweenCalls) {
+			console.log("⏰ Rate limit: Too soon since last analysis");
+			return res.status(429).json({
+				success: false,
+				message: "Please wait before requesting another analysis",
+				retryAfter: Math.ceil(
+					(minTimeBetweenCalls - (now - lastAnalysisTime)) / 1000
+				),
+			});
+		}
+
+		// Change detection: Only analyze if there are substantive changes
+		if (previousQuery && previousQuery.trim()) {
+			const changeThreshold = 0.3; // 30% change threshold
+			const similarity = calculateSimilarity(query, previousQuery);
+
+			if (similarity > 1 - changeThreshold) {
+				console.log(
+					"🔄 Change detection: Query too similar to previous, skipping analysis"
+				);
+				return res.json({
+					success: true,
+					analysis:
+						"<div class='text-muted'><i class='bi bi-info-circle'></i> Query hasn't changed significantly since last analysis.</div>",
+					skipped: true,
+				});
+			}
 		}
 
 		// Get the question to understand the context
@@ -392,6 +431,8 @@ Format the response in HTML with appropriate styling.`;
 		return res.json({
 			success: true,
 			analysis: analysis,
+			analysisTime: now,
+			queryHash: hashQuery(query),
 		});
 	} catch (error) {
 		console.error("❌ Error analyzing query:", error);
@@ -402,6 +443,63 @@ Format the response in HTML with appropriate styling.`;
 		});
 	}
 });
+
+// Helper function to calculate similarity between two queries
+function calculateSimilarity(query1, query2) {
+	// Normalize queries for comparison
+	const normalizeQuery = (q) => q.toLowerCase().replace(/\s+/g, " ").trim();
+	const norm1 = normalizeQuery(query1);
+	const norm2 = normalizeQuery(query2);
+
+	// Use Levenshtein distance to calculate similarity
+	const distance = levenshteinDistance(norm1, norm2);
+	const maxLength = Math.max(norm1.length, norm2.length);
+
+	return maxLength === 0 ? 1 : (maxLength - distance) / maxLength;
+}
+
+// Helper function to calculate Levenshtein distance
+function levenshteinDistance(str1, str2) {
+	const matrix = [];
+
+	for (let i = 0; i <= str2.length; i++) {
+		matrix[i] = [i];
+	}
+
+	for (let j = 0; j <= str1.length; j++) {
+		matrix[0][j] = j;
+	}
+
+	for (let i = 1; i <= str2.length; i++) {
+		for (let j = 1; j <= str1.length; j++) {
+			if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+				matrix[i][j] = matrix[i - 1][j - 1];
+			} else {
+				matrix[i][j] = Math.min(
+					matrix[i - 1][j - 1] + 1,
+					matrix[i][j - 1] + 1,
+					matrix[i - 1][j] + 1
+				);
+			}
+		}
+	}
+
+	return matrix[str2.length][str1.length];
+}
+
+// Helper function to create a simple hash of the query
+function hashQuery(query) {
+	let hash = 0;
+	const str = query.toLowerCase().trim();
+
+	for (let i = 0; i < str.length; i++) {
+		const char = str.charCodeAt(i);
+		hash = (hash << 5) - hash + char;
+		hash = hash & hash; // Convert to 32-bit integer
+	}
+
+	return hash.toString();
+}
 
 // Submit a data model answer
 router.post("/:id/submit-model", isAuthenticated, async (req, res) => {
@@ -533,11 +631,11 @@ IMPORTANT: Your response must be a valid JSON object. Do not include any text be
 			const [completionRecord, created] = await Completion.findOrCreate({
 				where: {
 					userId: req.session.userId,
-					questionId: questionId,
+					questionId: id,
 				},
 				defaults: {
 					userId: req.session.userId,
-					questionId: questionId,
+					questionId: id,
 					completedAt: new Date(),
 					evaluation: JSON.stringify(response),
 				},

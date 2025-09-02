@@ -144,17 +144,26 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                                 </h6>
                             </div>
                             <div class="card-body">
-                                <div id="realtime-feedback" class="realtime-feedback">
+                                <div id="realtime-feedback">
                                     <div class="text-muted">
-                                        <i class="bi bi-robot me-2"></i>
-                                        Start typing your query to get real-time feedback...
+                                        <i class="bi bi-robot"></i> Start typing a SQL query to get real-time
+                                        feedback...
                                     </div>
                                 </div>
-                                <div id="realtime-loading" class="text-center mt-3" style="display: none;">
-                                    <div class="spinner-border text-primary spinner-border-sm" role="status">
-                                        <span class="visually-hidden">Loading...</span>
+                                <div id="realtime-loading" style="display: none;">
+                                    <div class="d-flex align-items-center">
+                                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <small class="text-muted">Analyzing your query...</small>
                                     </div>
-                                    <small class="text-muted">Analyzing your query...</small>
+                                </div>
+                                <!-- Countdown timer for rate limiting -->
+                                <div id="countdown-timer" style="display: none;" class="mt-2">
+                                    <small class="text-muted">
+                                        <i class="bi bi-clock"></i> Next analysis available in <span
+                                            id="countdown-seconds">30</span> seconds
+                                    </small>
                                 </div>
                                 <!-- Test button for debugging -->
                                 <div class="mt-3">
@@ -311,7 +320,8 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
         const chatgptLoading = document.getElementById('chatgpt-loading');
         const chatgptContent = document.getElementById('chatgpt-content');
         const analysisStatusBadge = document.getElementById('analysis-status');
-
+        const countdownTimer = document.getElementById('countdown-timer');
+        const countdownSeconds = document.getElementById('countdown-seconds');
 
         // Execute query button click
         executeBtn.addEventListener('click', async function () {
@@ -634,7 +644,11 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ query: testQuery })
+                        body: JSON.stringify({ 
+                            query: testQuery,
+                            previousQuery: '',
+                            lastAnalysisTime: 0
+                        })
                     });
 
                     const result = await response.json();
@@ -644,6 +658,11 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                         realtimeFeedback.innerHTML = `<div class="alert alert-success"><strong>Test Query:</strong> ${testQuery}<br><br>${result.analysis}</div>`;
                         analysisStatusBadge.textContent = 'Ready';
                         analysisStatusBadge.className = 'badge bg-light text-dark';
+                        
+                        // Update tracking variables for consistency
+                        lastAnalysisTime = result.analysisTime || Date.now();
+                        lastAnalyzedQuery = testQuery;
+                        lastQueryHash = result.queryHash || '';
                     } else {
                         realtimeFeedback.innerHTML = `<div class="alert alert-danger">Test failed: ${result.message || 'Unknown error'}</div>`;
                         analysisStatusBadge.textContent = 'Failed';
@@ -660,8 +679,11 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
             });
         }
 
-        // Real-time query analysis
+        // Real-time query analysis with improved debouncing and change detection
         let analysisTimeout;
+        let lastAnalysisTime = 0;
+        let lastAnalyzedQuery = '';
+        let lastQueryHash = '';
         const realtimeFeedback = document.getElementById('realtime-feedback');
         const realtimeLoading = document.getElementById('realtime-loading');
 
@@ -674,17 +696,16 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
 
         sqlQuery.addEventListener('input', function () {
             const query = this.value.trim();
-            //console.log('Input event fired, query:', query);
-
+            const now = Date.now();
+            
             // Clear previous timeout
             if (analysisTimeout) {
                 clearTimeout(analysisTimeout);
             }
 
-            // Only analyze if query has at least 5 words
+            // Only analyze if query has at least 3 words
             const wordCount = query.split(/\s+/).filter(word => word.length > 0).length;
-            //console.log('Word count:', wordCount);
-
+            
             if (wordCount < 3) {
                 realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-robot"></i> Type at least 3 words to get real-time feedback...</div>';
                 return;
@@ -699,31 +720,80 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                 return;
             }
 
+            // Time-based throttling: Don't analyze if less than 30 seconds have passed
+            const timeSinceLastAnalysis = now - lastAnalysisTime;
+            const minTimeBetweenAnalyses = 30000; // 30 seconds
+            
+            if (timeSinceLastAnalysis < minTimeBetweenAnalyses) {
+                const remainingTime = Math.ceil((minTimeBetweenAnalyses - timeSinceLastAnalysis) / 1000);
+                realtimeFeedback.innerHTML = `<div class='text-muted'><i class='bi bi-clock'></i> Please wait ${remainingTime} seconds before requesting another analysis...</div>`;
+                return;
+            }
+
+            // Change detection: Don't analyze if query is too similar to last analyzed query
+            if (lastAnalyzedQuery && lastAnalyzedQuery.trim()) {
+                const similarity = calculateQuerySimilarity(query, lastAnalyzedQuery);
+                if (similarity > 0.7) { // 70% similarity threshold
+                    realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-info-circle"></i> Query hasn\'t changed significantly since last analysis...</div>';
+                    return;
+                }
+            }
+
             // Show loading state
             realtimeLoading.style.display = 'block';
             realtimeFeedback.innerHTML = '';
             analysisStatusBadge.textContent = 'Analyzing...';
             analysisStatusBadge.className = 'badge bg-info';
 
-            // Set a timeout to debounce the API call
+            // Set a timeout to debounce the API call (increased from 1s to 2s)
             analysisTimeout = setTimeout(async () => {
-                //console.log('Sending analysis request for query:', query);
                 try {
                     const response = await fetch(`/questions/${questionId}/analyze-realtime`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ query })
+                        body: JSON.stringify({ 
+                            query,
+                            previousQuery: lastAnalyzedQuery,
+                            lastAnalysisTime: lastAnalysisTime
+                        })
                     });
 
                     const result = await response.json();
                     console.log('Analysis response:', result);
 
                     if (result.success) {
-                        realtimeFeedback.innerHTML = result.analysis;
+                        if (result.skipped) {
+                            // Analysis was skipped due to change detection
+                            realtimeFeedback.innerHTML = result.analysis;
+                        } else {
+                            // New analysis received
+                            realtimeFeedback.innerHTML = result.analysis;
+                            lastAnalysisTime = result.analysisTime || now;
+                            lastAnalyzedQuery = query;
+                            lastQueryHash = result.queryHash || '';
+                        }
                         analysisStatusBadge.textContent = 'Ready';
                         analysisStatusBadge.className = 'badge bg-light text-dark';
+                    } else if (response.status === 429) {
+                        // Rate limited
+                        const retryAfter = result.retryAfter || 30;
+                        realtimeFeedback.innerHTML = `<div class="alert alert-warning"><i class="bi bi-clock"></i> Rate limited. Please wait ${retryAfter} seconds before requesting another analysis.</div>`;
+                        analysisStatusBadge.textContent = 'Rate Limited';
+                        analysisStatusBadge.className = 'badge bg-warning';
+                        countdownTimer.style.display = 'block';
+                        countdownSeconds.textContent = retryAfter;
+                        // Start countdown
+                        const countdownInterval = setInterval(() => {
+                            const currentSeconds = parseInt(countdownSeconds.textContent);
+                            if (currentSeconds > 0) {
+                                countdownSeconds.textContent = (currentSeconds - 1).toString();
+                            } else {
+                                clearInterval(countdownInterval);
+                                countdownTimer.style.display = 'none';
+                            }
+                        }, 1000);
                     } else {
                         realtimeFeedback.innerHTML = `<div class="alert alert-warning">${result.message || 'Failed to analyze query'}</div>`;
                         analysisStatusBadge.textContent = 'Failed';
@@ -737,7 +807,24 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                 } finally {
                     realtimeLoading.style.display = 'none';
                 }
-            }, 1000); // 1 second debounce
+            }, 2000); // Increased to 2 seconds for better debouncing
         });
+
+        // Helper function to calculate query similarity (frontend version)
+        function calculateQuerySimilarity(query1, query2) {
+            // Normalize queries for comparison
+            const normalizeQuery = (q) => q.toLowerCase().replace(/\s+/g, ' ').trim();
+            const norm1 = normalizeQuery(query1);
+            const norm2 = normalizeQuery(query2);
+            
+            // Simple similarity calculation based on common words
+            const words1 = norm1.split(' ');
+            const words2 = norm2.split(' ');
+            
+            const commonWords = words1.filter(word => words2.includes(word));
+            const totalWords = Math.max(words1.length, words2.length);
+            
+            return totalWords === 0 ? 1 : commonWords.length / totalWords;
+        }
     });
 </script>
