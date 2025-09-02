@@ -400,7 +400,7 @@ ${query}
 Provide real-time feedback on:
 1. Syntax correctness
 
-Keep the response to 100 words, focus on immediate, actionable feedback, no solution, no code.
+Keep the response to 128 tokens or less, focus on immediate, actionable feedback, no solution, no code.
 Format the response in HTML with appropriate styling.`;
 
 		console.log("🤖 Sending request to OpenAI...");
