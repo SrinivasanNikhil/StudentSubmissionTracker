@@ -276,17 +276,16 @@ ${userQuery}
 Reference Query:
 ${referenceQuery}
 
-Your response must include:
+Your response can include if necessary:
 	1. A step-by-step explanation of how each query works in MySQL
 	2. Differences in logic, syntax, and output within MySQL
-	3. Assume the audience is an undergraduate student with a technical background learning SQL in MySQL. Provide clear explanations with relevant MySQL examples if necessary.
-	4. Provide the response in 500 words or less.
+	3. Provide the response in 250 words or less.
 
 Format your response in a clear, structured way using HTML formatting.`;
 
 		// Get analysis from ChatGPT
 		const completion = await openai.chat.completions.create({
-			model: "gpt-4",
+			model: "gpt-4.1-nano",
 			messages: [
 				{
 					role: "system",
@@ -298,8 +297,8 @@ Format your response in a clear, structured way using HTML formatting.`;
 					content: prompt,
 				},
 			],
-			temperature: 0.7,
-			max_tokens: 1000,
+			temperature: 0.5,
+			max_tokens: 512,
 		});
 
 		const analysis = completion.choices[0].message.content;
@@ -408,7 +407,7 @@ Format the response in HTML with appropriate styling.`;
 
 		// Get analysis from ChatGPT
 		const completion = await openai.chat.completions.create({
-			model: "gpt-4.1-mini",
+			model: "gpt-4.1-nano",
 			messages: [
 				{
 					role: "system",
