@@ -408,7 +408,7 @@ Format the response in HTML with appropriate styling.`;
 
 		// Get analysis from ChatGPT
 		const completion = await openai.chat.completions.create({
-			model: "gpt-4",
+			model: "gpt-4.1-mini",
 			messages: [
 				{
 					role: "system",
