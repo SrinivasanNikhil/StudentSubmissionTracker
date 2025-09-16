@@ -16,7 +16,7 @@
 		{
 			"number": 3,
 			"text": "Report the total payments by date",
-			"solution_query": "SELECT paymentDate, SUM(amount) FROM PaymentsGROUP BY paymentDate"
+			"solution_query": "SELECT paymentDate, SUM(amount) FROM Payments GROUP BY paymentDate"
 		},
 		{
 			"number": 4,
@@ -26,7 +26,7 @@
 		{
 			"number": 5,
 			"text": "List the amount paid by each customer.",
-			"solution_query": "SELECT customerName, SUM(amount)FROM Payments JOIN Customers ON Payments.customerNumber = Customers.customerNumber GROUP BY customerName"
+			"solution_query": "SELECT customerName, SUM(amount) FROM Payments JOIN Customers ON Payments.customerNumber = Customers.customerNumber GROUP BY customerName"
 		},
 		{
 			"number": 6,
