@@ -1,0 +1,42 @@
+{
+	"title": "ClassicModels - Many To Many",
+	"type": "sql",
+	"database": "ClassicModels",
+	"questions": [
+		{
+			"number": 1,
+			"text": "List names of products sold by order date.",
+			"solution_query": "SELECT orderDate, productName FROM OrderDetails JOIN Orders ON OrderDetails.orderNumber = Orders.orderNumber JOIN Products on Products.productCode = OrderDetails.productCode ORDER BY orderDate ASC"
+		},
+		{
+			"number": 2,
+			"text": "List all the order dates in descending order for orders for the 1940 Ford Pickup Truck.",
+			"solution_query": "SELECT orderDate FROM OrderDetails JOIN Products ON OrderDetails.productCode = Products.productCode JOIN Orders ON Orders.orderNumber = OrderDetails.orderNumber WHERE productName = '1940 Ford Pickup Truck' ORDER BY orderDate DESC"
+		},
+		{
+			"number": 3,
+			"text": "List the names of customers and their corresponding order number where a particular order from that customer has a value greater than $25,000?",
+			"solution_query": "SELECT customerName, Orders.orderNumber, FORMAT(SUM(quantityOrdered * priceEach),2) AS Total FROM Customers JOIN Orders ON Customers.customerNumber = Orders.customerNumber JOIN OrderDetails ON Orders.orderNumber =OrderDetails.orderNumber GROUP BY orderNumber HAVING SUM(quantityOrdered * priceEach)> 25000"
+		},
+		{
+			"number": 4,
+			"text": "List the names of products sold at less than 80% of the MSRP.",
+			"solution_query": "SELECT DISTINCT(productName), priceEach, MSRP FROM OrderDetails JOIN Products ON OrderDetails.productCode = Products.productCode WHERE priceEach < .8*MSRP"
+		},
+		{
+			"number": 5,
+			"text": "Reports those products that have been sold with a markup of 100% or more (i.e., the priceEach is at least twice the buyPrice)",
+			"solution_query": "SELECT DISTINCT(productName)FROM Products JOIN OrderDetails ON Products.productCode = OrderDetails.productCode WHERE priceEach >= 2 * buyPrice ORDER BY productName"
+		},
+		{
+			"number": 6,
+			"text": "List the products ordered on a Monday.",
+			"solution_query": "SELECT DISTINCT(productName)FROM Orders JOIN OrderDetails ON Orders.orderNumber =OrderDetails.orderNumber JOIN Products ON OrderDetails.productCode = Products.productCode WHERE DAYNAME(orderDate) = \"Monday\""
+		},
+		{
+			"number": 7,
+			"text": "What is the quantity on hand for products listed on 'On Hold' orders?",
+			"solution_query": "SELECT productName, FORMAT(quantityInStock,0) AS `Quantity instock` FROM OrderDetails JOIN Orders ON Orders.orderNumber =OrderDetails.orderNumber JOIN Products on OrderDetails.productCode = Products.productCode WHERE status = 'On Hold'"
+		}
+	]
+}
