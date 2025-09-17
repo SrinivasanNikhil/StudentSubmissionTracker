@@ -36,7 +36,7 @@
 		{
 			"number": 7,
 			"text": "Who are the employees in Boston?",
-			"solution_query": "SELECT firstName, lastName FROM Employees JOIN Offices ON Employees.officeCode = Offices.officeCodeAND city = 'Boston'"
+			"solution_query": "SELECT firstName, lastName FROM Employees JOIN Offices ON Employees.officeCode = Offices.officeCode AND city = 'Boston'"
 		},
 		{
 			"number": 8,
