@@ -46,7 +46,7 @@
 		{
 			"number": 9,
 			"text": "List the names of employees called Larry or Barry.",
-			"solution_query": "SELECT * FROM Employees WHERE firstName REGEXP '[BL]array'"
+			"solution_query": "SELECT * FROM Employees WHERE firstName REGEXP '[BL]arry'"
 		},
 		{
 			"number": 10,
