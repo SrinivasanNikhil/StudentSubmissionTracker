@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { User, Completion, Question, Topic } = require("../models");
+const { User, Completion, Question, Topic, InstructorCourseSection } = require("../models");
 const { isAuthenticated, isAdmin } = require("../middleware/auth");
 const { Op } = require("sequelize");
 const createCsvStringifier = require("csv-writer").createObjectCsvStringifier;
@@ -1010,6 +1010,271 @@ router.get(
 			res.status(500).json({
 				success: false,
 				message: "Failed to fetch students",
+			});
+		}
+	}
+);
+
+// Export by topic form page (admin version)
+router.get(
+	"/export/by-topic/form",
+	isAuthenticated,
+	isAdmin,
+	async (req, res) => {
+		try {
+			// Get all topics with question counts
+			const topics = await Topic.findAll({
+				attributes: ["id", "name", "type", "database"],
+				order: [["name", "ASC"]],
+			});
+
+			// Get question counts for each topic
+			const topicsWithCounts = await Promise.all(
+				topics.map(async (topic) => {
+					const questionCount = await Question.count({
+						where: { topicId: topic.id },
+					});
+					return {
+						id: topic.id,
+						name: topic.name,
+						type: topic.type,
+						database: topic.database,
+						questionCount,
+					};
+				})
+			);
+
+			// Filter out topics with no questions
+			const filteredTopics = topicsWithCounts.filter(
+				(topic) => topic.questionCount > 0
+			);
+
+			// Get unique academic years, semesters, and course sections from all users
+			const students = await User.findAll({
+				where: { role: "student" },
+				attributes: ["academicYear", "semester", "courseSection"],
+			});
+
+			const academicYearsSet = new Set();
+			const semestersSet = new Set();
+			const courseSectionsMap = new Map();
+
+			students.forEach((student) => {
+				if (student.academicYear) {
+					academicYearsSet.add(student.academicYear);
+				}
+				if (student.semester) {
+					semestersSet.add(student.semester);
+				}
+				if (student.courseSection) {
+					if (!courseSectionsMap.has(student.courseSection)) {
+						courseSectionsMap.set(student.courseSection, {
+							identifier: student.courseSection,
+							displayName: student.courseSection,
+						});
+					}
+				}
+			});
+
+			res.render("pages/instructor/export-by-topic", {
+				title: "Export by Topic",
+				topics: filteredTopics,
+				academicYears: Array.from(academicYearsSet).sort().reverse(),
+				semesters: Array.from(semestersSet),
+				courseSections: Array.from(courseSectionsMap.values()),
+				isAdmin: true,
+			});
+		} catch (error) {
+			console.error("Error loading admin export by topic form:", error);
+			res.status(500).render("pages/error", {
+				title: "Error",
+				message: "Failed to load export form. Please try again later.",
+			});
+		}
+	}
+);
+
+// Export by topic CSV generation (admin version)
+router.get(
+	"/export/by-topic",
+	isAuthenticated,
+	isAdmin,
+	async (req, res) => {
+		try {
+			let { topicIds, academicYear, semester, courseSection } = req.query;
+
+			// Handle topicIds - can be a single value or array
+			if (!topicIds) {
+				return res.redirect("/admin/export/by-topic/form");
+			}
+
+			// Ensure topicIds is an array
+			if (!Array.isArray(topicIds)) {
+				topicIds = [topicIds];
+			}
+
+			// Convert to integers
+			topicIds = topicIds.map((id) => parseInt(id, 10)).filter((id) => !isNaN(id));
+
+			if (topicIds.length === 0) {
+				return res.redirect("/admin/export/by-topic/form");
+			}
+
+			// Build student filter conditions
+			const studentWhereCondition = {
+				role: "student",
+			};
+
+			// Add semester filters if provided
+			if (academicYear && academicYear !== "all") {
+				studentWhereCondition.academicYear = academicYear;
+			}
+			if (semester && semester !== "all") {
+				studentWhereCondition.semester = semester;
+			}
+			if (courseSection && courseSection !== "all") {
+				studentWhereCondition.courseSection = courseSection;
+			}
+
+			// Get all students with filters
+			const students = await User.findAll({
+				where: studentWhereCondition,
+				attributes: ["id", "email", "firstName", "lastName", "code"],
+				order: [["lastName", "ASC"], ["firstName", "ASC"]],
+			});
+
+			if (students.length === 0) {
+				return res.status(404).render("pages/error", {
+					title: "No Students",
+					message: "No students found matching the selected filters.",
+				});
+			}
+
+			// Get selected topics with their question counts
+			const topics = await Topic.findAll({
+				where: {
+					id: {
+						[Op.in]: topicIds,
+					},
+				},
+				attributes: ["id", "name"],
+				order: [["name", "ASC"]],
+			});
+
+			// Get question counts per topic
+			const topicQuestionCounts = {};
+			for (const topic of topics) {
+				topicQuestionCounts[topic.id] = await Question.count({
+					where: { topicId: topic.id },
+				});
+			}
+
+			// Get student IDs
+			const studentIds = students.map((student) => student.id);
+
+			// Get all completions for these students for the selected topics
+			const completions = await Completion.findAll({
+				where: {
+					userId: {
+						[Op.in]: studentIds,
+					},
+				},
+				include: [
+					{
+						model: Question,
+						as: "question",
+						where: {
+							topicId: {
+								[Op.in]: topicIds,
+							},
+						},
+						attributes: ["id", "topicId"],
+					},
+				],
+				attributes: ["userId", "questionId"],
+			});
+
+			// Build a map of student -> topic -> completion count
+			const studentTopicCompletions = new Map();
+			completions.forEach((completion) => {
+				const userId = completion.userId;
+				const topicId = completion.question.topicId;
+
+				if (!studentTopicCompletions.has(userId)) {
+					studentTopicCompletions.set(userId, new Map());
+				}
+
+				const topicMap = studentTopicCompletions.get(userId);
+				if (!topicMap.has(topicId)) {
+					topicMap.set(topicId, 0);
+				}
+				topicMap.set(topicId, topicMap.get(topicId) + 1);
+			});
+
+			// Build CSV headers
+			const headers = [
+				{ id: "email", title: "Email" },
+				{ id: "name", title: "Name" },
+				{ id: "code", title: "Code" },
+			];
+
+			// Add topic columns
+			topics.forEach((topic) => {
+				headers.push({
+					id: `topic_${topic.id}`,
+					title: topic.name,
+				});
+			});
+
+			// Add total column
+			headers.push({ id: "total", title: "Total" });
+
+			const csvStringifier = createCsvStringifier({ header: headers });
+
+			// Generate CSV data
+			const csvData = students.map((student) => {
+				const studentData = {
+					email: student.email,
+					name:
+						`${student.firstName || ""} ${student.lastName || ""}`.trim() ||
+						"Not provided",
+					code: student.code || "Not set",
+				};
+
+				let totalCompleted = 0;
+				let totalQuestions = 0;
+
+				// Add completion data for each topic
+				const topicMap = studentTopicCompletions.get(student.id) || new Map();
+				topics.forEach((topic) => {
+					const completed = topicMap.get(topic.id) || 0;
+					const total = topicQuestionCounts[topic.id] || 0;
+					studentData[`topic_${topic.id}`] = `${completed}/${total}`;
+					totalCompleted += completed;
+					totalQuestions += total;
+				});
+
+				studentData.total = `${totalCompleted}/${totalQuestions}`;
+
+				return studentData;
+			});
+
+			// Set response headers for CSV download
+			res.setHeader("Content-Type", "text/csv");
+			res.setHeader(
+				"Content-Disposition",
+				`attachment; filename="students-by-topic-${Date.now()}.csv"`
+			);
+
+			// Write CSV header and data
+			res.write(csvStringifier.getHeaderString());
+			res.write(csvStringifier.stringifyRecords(csvData));
+			res.end();
+		} catch (error) {
+			console.error("Error exporting by topic (admin):", error);
+			res.status(500).render("pages/error", {
+				title: "Error",
+				message: "Failed to export data by topic. Please try again later.",
 			});
 		}
 	}

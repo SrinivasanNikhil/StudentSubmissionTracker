@@ -24,6 +24,7 @@ A comprehensive web application designed to help university students track and m
 - **Semester-Based Organization**: Organize courses by academic year and semester
 - **Progress Monitoring**: Track student progress across all course sections
 - **Export Capabilities**: Export semester-based data for analysis and reporting
+- **Export by Topic**: Customizable topic-based export with completion counts per topic (completed/total format)
 - **Instructor Code System**: Unique instructor codes for student registration
 
 ### Administrator Features
@@ -287,6 +288,8 @@ StudentSubmissionTracker/
 - `GET /instructor/course-management/export/semester` - Export semester data
 - `GET /instructor/students` - View enrolled students
 - `GET /instructor/submissions` - View student submissions
+- `GET /instructor/export/by-topic/form` - Export by topic selection form
+- `GET /instructor/export/by-topic` - Generate topic-based CSV export
 
 ## Dependencies
 
@@ -401,6 +404,7 @@ Ensure all required environment variables are set in `.env`:
 
 ## Recent Updates
 
+- ✅ **📋 Export by Topic**: New customizable topic-based export for instructors with selectable topics and completed/total format
 - ✅ **🤖 Enhanced AI Capabilities**: Advanced OpenAI GPT-4 and GPT-4 Vision integration for intelligent analysis
 - ✅ **🔍 AI-Powered Query Analysis**: Intelligent SQL query comparison and feedback system
 - ✅ **📊 Automated ER Diagram Evaluation**: Computer vision-based diagram analysis with detailed scoring
