@@ -9,6 +9,15 @@ const { Topic, Question } = require("../models");
 const loadReferenceData = async () => {
 	try {
 		const referenceDir = path.join(__dirname, "../reference_files");
+
+		// If directory doesn't exist, skip loading
+		try {
+			await fs.access(referenceDir);
+		} catch {
+			console.log("Reference files directory not found, skipping reference data loading");
+			return;
+		}
+
 		const files = await fs.readdir(referenceDir);
 		const jsonFiles = files.filter((file) => file.endsWith(".json"));
 
