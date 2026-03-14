@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Question, Topic, Completion, User } = require("../models");
+const { Question, Topic, Completion, User, InteractionLog } = require("../models");
 const { isAuthenticated } = require("../middleware/auth");
 const { executeQuery, compareQueries } = require("../services/sqlExecutor");
 const { OpenAI } = require("openai");
@@ -113,10 +113,12 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 			},
 		});
 
+		const user = await User.findByPk(req.session.userId);
 		res.render("pages/question-detail", {
 			title: `Question #${question.id}`,
 			question,
 			completed: !!completion,
+			aiFeedbackEnabled: user ? user.aiFeedbackEnabled : true,
 		});
 	} catch (error) {
 		console.error("Error fetching question:", error);
@@ -226,6 +228,16 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			}
 		}
 
+		// Log the query attempt
+		const userForLog = await User.findByPk(userId);
+		await logInteraction(userId, id, "query_attempt", {
+			queryText: query,
+			isCorrect: isCompleted,
+			rowsMatch: comparison?.rowsMatch || false,
+			columnsMatch: comparison?.columnsMatch || false,
+			columnNamesMatch: comparison?.columnNamesMatch || false,
+		}, userForLog);
+
 		// Return the results
 		return res.json({
 			success: result.success,
@@ -324,6 +336,11 @@ router.post("/:id/analyze-realtime", isAuthenticated, async (req, res) => {
 		const { query, previousQuery, lastAnalysisTime } = req.body;
 		const { id } = req.params;
 		const userId = req.session.userId;
+		const user = await User.findByPk(userId);
+
+		if (!user.aiFeedbackEnabled) {
+			return res.json({ success: true, disabled: true, analysis: null });
+		}
 
 		console.log("Request details:", {
 			id,
@@ -425,6 +442,11 @@ Format the response in HTML with appropriate styling.`;
 
 		const analysis = completion.choices[0].message.content;
 		console.log("✅ OpenAI analysis received, length:", analysis.length);
+
+		await logInteraction(userId, id, "ai_feedback_requested", {
+			queryLength: query.length,
+			analysisLength: analysis.length,
+		}, user);
 
 		return res.json({
 			success: true,
@@ -712,5 +734,36 @@ router.get("/:id/completion", isAuthenticated, async (req, res) => {
 		});
 	}
 });
+
+// Log answer reveal event
+router.post("/:id/log-reveal", isAuthenticated, async (req, res) => {
+	try {
+		const { id } = req.params;
+		const userId = req.session.userId;
+		const user = await User.findByPk(userId);
+		await logInteraction(userId, id, "answer_revealed", {}, user);
+		return res.json({ success: true });
+	} catch (error) {
+		console.error("Error logging reveal:", error);
+		return res.status(500).json({ success: false });
+	}
+});
+
+async function logInteraction(userId, questionId, eventType, eventData, user) {
+	try {
+		await InteractionLog.create({
+			userId,
+			questionId,
+			eventType,
+			eventData,
+			occurredAt: new Date(),
+			academicYear: user?.academicYear || null,
+			semester: user?.semester || null,
+			courseSection: user?.courseSection || null,
+		});
+	} catch (err) {
+		console.error("InteractionLog write failed (non-blocking):", err.message);
+	}
+}
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const { Sequelize } = require("sequelize");
 const { sequelize } = require("../config/database");
-const migration = require("../migrations/20240321_add_code_to_users");
+const migration = require("../migrations/20260221000001-add-interaction-logging");
 
 async function runMigration() {
 	try {

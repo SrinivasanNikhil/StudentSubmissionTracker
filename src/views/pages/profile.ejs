@@ -129,6 +129,28 @@
                                         <% } %>
 
                                             <div class="mb-4 border-top pt-4">
+                                                <label class="form-label"><strong>Learning Preferences</strong></label>
+                                                <div class="card">
+                                                    <div class="card-body py-2 d-flex align-items-center justify-content-between">
+                                                        <div>
+                                                            <i class="bi bi-robot me-2"></i>Real-time AI Feedback
+                                                            <div class="text-muted" style="font-size:0.875rem;">
+                                                                When enabled, AI provides syntax hints as you write SQL queries
+                                                            </div>
+                                                        </div>
+                                                        <div class="form-check form-switch mb-0">
+                                                            <input class="form-check-input" type="checkbox" id="aiFeedbackToggleProfile"
+                                                                   <%= user.aiFeedbackEnabled ? 'checked' : '' %>
+                                                                   style="width:3em; height:1.5em; cursor:pointer;">
+                                                            <label class="form-check-label ms-2" for="aiFeedbackToggleProfile" id="profileToggleLabel">
+                                                                <%= user.aiFeedbackEnabled ? 'Enabled' : 'Disabled' %>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-4 border-top pt-4">
                                                 <h5>Account Information</h5>
                                                 <p class="text-muted">You are registered with the email: <strong>
                                                         <%= user.email %>
@@ -170,3 +192,20 @@
         </div>
     </div>
 </div>
+
+<script>
+    const profileToggle = document.getElementById('aiFeedbackToggleProfile');
+    const profileLabel = document.getElementById('profileToggleLabel');
+
+    profileToggle.addEventListener('change', async function () {
+        profileLabel.textContent = this.checked ? 'Enabled' : 'Disabled';
+        try {
+            await fetch('/profile/toggle-ai-feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (e) {
+            console.error('Failed to save AI feedback preference:', e);
+        }
+    });
+</script>

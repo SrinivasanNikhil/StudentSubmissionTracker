@@ -36,6 +36,7 @@ router.get("/", isAuthenticated, async (req, res) => {
 			semester: user.semester || "",
 			courseSection: user.courseSection || "",
 			role: user.role || "student", // Explicitly include role
+			aiFeedbackEnabled: user.aiFeedbackEnabled !== false ? true : false,
 		};
 
 		res.render("pages/profile", {
@@ -289,5 +290,23 @@ router.post(
 		}
 	}
 );
+
+// Toggle AI feedback preference
+router.post("/toggle-ai-feedback", isAuthenticated, async (req, res) => {
+	try {
+		const user = await User.findByPk(req.session.userId);
+		if (!user) return res.status(404).json({ success: false });
+		await user.update({ aiFeedbackEnabled: !user.aiFeedbackEnabled });
+		return res.json({
+			success: true,
+			aiFeedbackEnabled: user.aiFeedbackEnabled,
+		});
+	} catch (error) {
+		console.error("Error toggling AI feedback:", error);
+		return res
+			.status(500)
+			.json({ success: false, message: error.message });
+	}
+});
 
 module.exports = router;

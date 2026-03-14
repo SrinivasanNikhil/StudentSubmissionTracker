@@ -176,6 +176,13 @@ module.exports = (sequelize) => {
 				field: "course_section",
 				comment: "Course section identifier (e.g., 'CS101-A', 'CS101-B')",
 			},
+			aiFeedbackEnabled: {
+				type: DataTypes.BOOLEAN,
+				allowNull: false,
+				defaultValue: true,
+				field: "ai_feedback_enabled",
+				comment: "Whether the student has enabled real-time AI feedback",
+			},
 		},
 		{
 			sequelize,
