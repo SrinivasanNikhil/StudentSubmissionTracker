@@ -260,6 +260,27 @@ const normalizeColumnName = (columnName) => {
 };
 
 /**
+ * Return true if the query is a read-only SELECT statement.
+ * Rejects anything that could mutate the practice databases.
+ */
+const isSelectOnly = (query) => {
+	const normalized = query
+		.replace(/--.*$/gm, "")        // strip line comments
+		.replace(/\/\*[\s\S]*?\*\//g, "") // strip block comments
+		.trim()
+		.toUpperCase();
+
+	// Must start with SELECT (or WITH … SELECT for CTEs)
+	if (!/^(SELECT|WITH)\b/.test(normalized)) {
+		return false;
+	}
+
+	// Reject any destructive keywords anywhere in the statement
+	const forbidden = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|RENAME|GRANT|REVOKE|CALL|EXEC|EXECUTE|LOAD|LOCK|UNLOCK)\b/;
+	return !forbidden.test(normalized);
+};
+
+/**
  * Execute a SQL query on the appropriate MySQL database
  * @param {string} query - The SQL query to execute
  * @param {string} databaseName - Database name: 'ClassicModels', 'Northwind', or 'Text'
@@ -267,6 +288,17 @@ const normalizeColumnName = (columnName) => {
  */
 const executeQuery = async (query, databaseName) => {
 	try {
+		if (!isSelectOnly(query)) {
+			return {
+				success: false,
+				message: "Only SELECT queries are allowed. Data modification statements are not permitted.",
+				error: "QUERY_NOT_ALLOWED",
+				data: [],
+				columns: [],
+				rows: 0,
+			};
+		}
+
 		// Select the correct database connection
 		let dbConnection;
 		switch (databaseName) {
@@ -471,4 +503,5 @@ const compareQueries = async (studentQuery, solutionQuery, databaseName) => {
 module.exports = {
 	executeQuery,
 	compareQueries,
+	isSelectOnly,
 };

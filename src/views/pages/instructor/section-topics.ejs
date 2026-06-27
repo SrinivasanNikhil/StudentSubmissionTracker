@@ -1,0 +1,166 @@
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/instructor/dashboard">Instructor Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/instructor/course-management/course-sections">Course Sections</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Topic Settings</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>Topic Settings</h1>
+            <p class="text-muted mb-0">
+                <strong><%= courseSection.getDisplayName() %></strong>
+                &mdash; <%= courseSection.semester %> <%= courseSection.academicYear %>
+            </p>
+        </div>
+        <a href="/instructor/course-management/course-sections/<%= courseSection.id %>/students"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-people me-1"></i> View Students
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Topics</h5>
+            <small class="text-muted">Changes are saved automatically when you toggle visibility or change a due date.</small>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Topic</th>
+                            <th>Type</th>
+                            <th class="text-center" style="width: 120px;">Visible to Students</th>
+                            <th style="width: 260px;">Due Date</th>
+                            <th style="width: 140px;">Grace (min)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% topicsWithSettings.forEach(topic => { %>
+                            <tr id="row-<%= topic.id %>">
+                                <td>
+                                    <strong><%= topic.name %></strong>
+                                </td>
+                                <td>
+                                    <% if (topic.type === 'sql') { %>
+                                        <span class="badge bg-primary">SQL</span>
+                                    <% } else if (topic.type === 'data_model') { %>
+                                        <span class="badge bg-info text-dark">Data Model</span>
+                                    <% } else if (topic.type === 'er_diagram') { %>
+                                        <span class="badge bg-warning text-dark">ER Diagram</span>
+                                    <% } else { %>
+                                        <span class="badge bg-secondary"><%= topic.type %></span>
+                                    <% } %>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check form-switch d-flex justify-content-center mb-0">
+                                        <input class="form-check-input topic-visible-toggle"
+                                               type="checkbox"
+                                               id="visible-<%= topic.id %>"
+                                               data-topic-id="<%= topic.id %>"
+                                               style="width: 2.5em; height: 1.4em; cursor: pointer;"
+                                               <%= topic.isVisible ? 'checked' : '' %>>
+                                    </div>
+                                </td>
+                                <td>
+                                    <input type="datetime-local"
+                                           class="form-control form-control-sm topic-due-date"
+                                           id="duedate-<%= topic.id %>"
+                                           data-topic-id="<%= topic.id %>"
+                                           value="<%= topic.dueDate ? (d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`)(new Date(topic.dueDate)) : '' %>">
+                                </td>
+                                <td>
+                                    <input type="number"
+                                           min="0"
+                                           class="form-control form-control-sm topic-grace-input"
+                                           id="grace-<%= topic.id %>"
+                                           data-topic-id="<%= topic.id %>"
+                                           value="<%= topic.gracePeriodMinutes || 0 %>">
+                                </td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const sectionId = <%= courseSection.id %>;
+
+    async function saveSetting(topicId, isVisible, dueDate, gracePeriodMinutes) {
+        const row = document.getElementById('row-' + topicId);
+        if (row) {
+            row.style.opacity = '0.5';
+            row.style.pointerEvents = 'none';
+        }
+        try {
+            const response = await fetch(
+                `/instructor/course-management/course-sections/${sectionId}/topics/settings`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        topicId,
+                        isVisible: Boolean(isVisible),
+                        dueDate: dueDate || '',
+                        gracePeriodMinutes: gracePeriodMinutes || 0,
+                    }),
+                }
+            );
+            const result = await response.json();
+            if (result.success) {
+                window.sstToast('success', 'Settings saved.');
+            } else {
+                window.sstToast('error', 'Failed to save: ' + (result.message || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error('Error saving topic setting:', err);
+            window.sstToast('error', 'An error occurred while saving.');
+        } finally {
+            if (row) {
+                row.style.opacity = '';
+                row.style.pointerEvents = '';
+            }
+        }
+    }
+
+    document.querySelectorAll('.topic-visible-toggle').forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            const topicId = this.dataset.topicId;
+            const isVisible = this.checked;
+            const dueDateInput = document.getElementById('duedate-' + topicId);
+            const graceInput = document.getElementById('grace-' + topicId);
+            saveSetting(topicId, isVisible, dueDateInput ? dueDateInput.value : '', graceInput ? graceInput.value : 0);
+        });
+    });
+
+    document.querySelectorAll('.topic-due-date').forEach(function (input) {
+        input.addEventListener('change', function () {
+            const topicId = this.dataset.topicId;
+            const dueDate = this.value;
+            const visibleToggle = document.getElementById('visible-' + topicId);
+            const isVisible = visibleToggle ? visibleToggle.checked : true;
+            const graceInput = document.getElementById('grace-' + topicId);
+            saveSetting(topicId, isVisible, dueDate, graceInput ? graceInput.value : 0);
+        });
+    });
+
+    document.querySelectorAll('.topic-grace-input').forEach(function (input) {
+        input.addEventListener('change', function () {
+            const topicId = this.dataset.topicId;
+            const gracePeriodMinutes = this.value;
+            const visibleToggle = document.getElementById('visible-' + topicId);
+            const isVisible = visibleToggle ? visibleToggle.checked : true;
+            const dueDateInput = document.getElementById('duedate-' + topicId);
+            saveSetting(topicId, isVisible, dueDateInput ? dueDateInput.value : '', gracePeriodMinutes);
+        });
+    });
+
+});
+</script>

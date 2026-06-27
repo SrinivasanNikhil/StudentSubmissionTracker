@@ -1,5 +1,51 @@
 // Main JavaScript file for SQL Practice application
 
+// Global toast notification system
+window.sstToast = function(type, message, duration) {
+	if (duration === undefined) duration = 4000;
+	const container = document.getElementById('sst-toast-container');
+	if (!container) return;
+	const icons = {
+		success: 'check-circle-fill',
+		error: 'exclamation-triangle-fill',
+		warning: 'exclamation-circle',
+		info: 'info-circle'
+	};
+	const colors = {
+		success: 'text-bg-success',
+		error: 'text-bg-danger',
+		warning: 'text-bg-warning',
+		info: 'text-bg-info'
+	};
+	const toast = document.createElement('div');
+	toast.className = 'toast show align-items-center border-0 ' + (colors[type] || colors.info);
+	toast.setAttribute('role', 'alert');
+
+	const outer = document.createElement('div');
+	outer.className = 'd-flex';
+
+	const body = document.createElement('div');
+	body.className = 'toast-body d-flex align-items-center gap-2';
+
+	const icon = document.createElement('i');
+	icon.className = 'bi bi-' + (icons[type] || icons.info);
+
+	const text = document.createElement('span');
+	text.textContent = String(message);
+
+	body.append(icon, text);
+
+	const closeBtn = document.createElement('button');
+	closeBtn.type = 'button';
+	closeBtn.className = 'btn-close btn-close-white me-2 m-auto';
+	closeBtn.addEventListener('click', function() { toast.remove(); });
+
+	outer.append(body, closeBtn);
+	toast.appendChild(outer);
+	container.appendChild(toast);
+	if (duration > 0) setTimeout(function() { toast.remove(); }, duration);
+};
+
 document.addEventListener("DOMContentLoaded", function () {
 	// Handle completion form submission via AJAX if available
 	const completionForms = document.querySelectorAll(
@@ -62,10 +108,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							// Enable the button again
 							submitButton.disabled = false;
 						} else {
-							// Show error message
-							alert(
-								"Error: " + (data.message || "Failed to update question status")
-							);
+							window.sstToast('error', data.message || 'Failed to update question status');
 							submitButton.disabled = false;
 
 							// Reset button text
@@ -76,7 +119,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					})
 					.catch((error) => {
 						console.error("Error:", error);
-						alert("An error occurred. Please try again.");
+						window.sstToast('error', 'An error occurred. Please try again.');
 						submitButton.disabled = false;
 
 						// Reset button text
@@ -89,8 +132,9 @@ document.addEventListener("DOMContentLoaded", function () {
 		});
 	});
 
-	// Auto-dismiss alerts after 5 seconds
-	const alerts = document.querySelectorAll(".alert:not(.alert-success)");
+	// Auto-dismiss flash alerts after 5 seconds — scoped to #flash-messages only
+	// so inline functional alerts (SQL errors, solution lock, deadline warnings) are unaffected
+	const alerts = document.querySelectorAll("#flash-messages .alert:not(.alert-success)");
 	alerts.forEach((alert) => {
 		setTimeout(() => {
 			alert.style.opacity = "0";

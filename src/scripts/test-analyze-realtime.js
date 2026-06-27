@@ -2,12 +2,12 @@ require("dotenv").config();
 const http = require("http");
 
 /**
- * Test script to verify the analyze-realtime route is working
+ * Test script to verify the analyze-syntax route is working
  */
 
-const testAnalyzeRealtime = async () => {
+const testAnalyzeSyntax = async () => {
 	try {
-		console.log("🧪 Testing analyze-realtime route...");
+		console.log("🧪 Testing analyze-syntax route...");
 
 		// Test data
 		const testData = {
@@ -22,7 +22,7 @@ const testAnalyzeRealtime = async () => {
 		const options = {
 			hostname: "localhost",
 			port: 3000,
-			path: "/questions/1/analyze-realtime",
+			path: "/questions/1/analyze-syntax",
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -65,4 +65,4 @@ const testAnalyzeRealtime = async () => {
 };
 
 // Run the test
-testAnalyzeRealtime();
+testAnalyzeSyntax();

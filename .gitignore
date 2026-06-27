@@ -1,21 +1,61 @@
+# Dependencies
 node_modules/
+
+# Environment
 .env
+
+# OS
 .DS_Store
-npm-debug.log
+**/.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Editor
+.vscode/
+.cursor/
+.idea/
+*.swp
+*.swo
+
+# Database
 *.sqlite
 *.sqlite-journal
-coverage/
-.vscode/ 
+
+# User-uploaded content
+src/public/uploads/
+
+# Deployment & ops (server-specific, not for version control)
 deployment-lightsail.md
 deployment-modifications.md
 deployment-railway.md
-cookies.txt
-.cursor/
+ssl-setup-manual.md
 nginx-ssl-config.conf
 setup-ssl.sh
-ssl-setup-manual.md
+
+# Design assets & planning docs (local working files)
+design-brief.md
+claude-code-prompt.md
+TODO.md
+userinterfaceimprovements.md
+uxaudit.md
+sst-interaction-logging-spec.md
+SEMESTER_TRACKING_IMPLEMENTATION.md
+COLUMN_MATCHING_ENHANCEMENT.md
+COMPLETION_LOGIC_UPDATE.md
+warm-scholar/
+"Warm Scholar Design System.zip"
+docs/
+CLAUDE.md
+docs/review-2026-06-04.md
+docs/system-understanding.md
+
+# One-off scripts
 session-fix.js
 fix-sessions.sh
 test-password-validation.js
+
+# Misc
+cookies.txt
 env-example-password-reset.txt
-SEMESTER_TRACKING_IMPLEMENTATION.md

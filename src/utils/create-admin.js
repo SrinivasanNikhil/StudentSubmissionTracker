@@ -8,7 +8,7 @@
  * node src/utils/create-admin.js <email> <password>
  */
 
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const dotenv = require("dotenv");
 const { User } = require("../models");
 const { testConnection } = require("../config/database");

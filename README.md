@@ -9,6 +9,9 @@ A comprehensive web application designed to help university students track and m
 - **User Authentication**: Secure login and registration system with role-based access (student/instructor/admin)
 - **Password Reset**: Secure password reset functionality with email verification and token-based authentication
 - **SQL Practice**: Interactive SQL question practice with real-time query execution
+- **Fuzzy Completion**: Questions are marked complete when row count and column count match — column alias differences no longer block completion
+- **Solution Unlock**: Reference solution and AI comparison are hidden until a student has made ≥ 5 attempts with at least 75% of expected rows matched (or the question is already completed)
+- **Due Date Awareness**: Topics with deadlines show warning/danger badges; submitting after the deadline still executes the query but does not record a completion
 - **ER Diagram Submissions**: Upload and submit ER diagrams for data modeling questions
 - **Progress Tracking**: Monitor completion status across all topics and question types
 - **Student Dashboard**: View submitted diagrams and instructor feedback
@@ -20,11 +23,11 @@ A comprehensive web application designed to help university students track and m
 
 - **Instructor Dashboard**: Comprehensive dashboard for course and student management
 - **Course Section Management**: Create and manage multiple course sections per semester
+- **Per-Section Topic Settings**: Control which topics are visible to each course section and set per-topic due dates — managed via a dedicated settings page accessible from the Course Sections list
 - **Student Enrollment Tracking**: View students enrolled in each course section
 - **Semester-Based Organization**: Organize courses by academic year and semester
 - **Progress Monitoring**: Track student progress across all course sections
-- **Export Capabilities**: Export semester-based data for analysis and reporting
-- **Export by Topic**: Customizable topic-based export with completion counts per topic (completed/total format)
+- **Export Center**: Single page offering Topic Completion Summary, Detailed Question Attempts, Student Completion Matrix, and ER Diagram Submissions exports, all filterable by academic year, semester, and course section
 - **Instructor Code System**: Unique instructor codes for student registration
 
 ### Administrator Features
@@ -225,7 +228,7 @@ StudentSubmissionTracker/
 - **Course Section Management**: Multi-semester course section organization and student enrollment
 - **Student Registration**: Semester-based student registration and tracking
 - **Progress Monitoring**: Track student progress across all course sections
-- **Data Export**: Semester-based data export and reporting capabilities
+- **Data Export**: Export Center with semester/section-filtered reporting (see Export Center feature above)
 
 ## Database Models
 
@@ -235,6 +238,7 @@ StudentSubmissionTracker/
 - **Completion**: Tracks user progress and submissions with semester information
 - **Session**: Manages user sessions for authentication
 - **InstructorCourseSection**: Manages course sections with semester and academic year tracking
+- **InstructorSectionTopicSetting**: Per-section, per-topic configuration — stores `isVisible` (whether the topic is shown to students in a section) and `dueDate` (optional deadline after which completions are not recorded). One row per `(section, topic)` pair; rows are created on first save and upserted on subsequent changes
 
 ## API Endpoints
 
@@ -275,9 +279,8 @@ StudentSubmissionTracker/
 - `GET /admin/instructors/:instructorId/course-sections/:sectionId/students` - Get course section students
 - `GET /admin/submissions` - ER diagram submissions
 - `POST /admin/submissions/:id` - Update admin review
-- `GET /admin/export/completions` - Export completions matrix
-- `GET /admin/export/summary` - Export summary report
-- `GET /admin/export/instructors` - Export instructor data
+- `GET /admin/export` - Export Center page (type selector + filters)
+- `GET /admin/export/run?type=...` - Generate CSV for the selected export type (`topic-summary`, `detailed-attempts`, `matrix`, `instructors`)
 
 ### Instructor Routes
 
@@ -285,11 +288,12 @@ StudentSubmissionTracker/
 - `GET /instructor/course-management` - Course section management
 - `GET /instructor/course-management/course-sections` - View course sections
 - `POST /instructor/course-management/course-sections` - Create course section
-- `GET /instructor/course-management/export/semester` - Export semester data
+- `GET /instructor/course-management/course-sections/:id/topics` - Manage topic visibility and due dates for a section
+- `POST /instructor/course-management/course-sections/:id/topics/settings` - Save a single topic setting (upsert)
 - `GET /instructor/students` - View enrolled students
 - `GET /instructor/submissions` - View student submissions
-- `GET /instructor/export/by-topic/form` - Export by topic selection form
-- `GET /instructor/export/by-topic` - Generate topic-based CSV export
+- `GET /instructor/export` - Export Center page (type selector + filters)
+- `GET /instructor/export/run?type=...` - Generate CSV for the selected export type (`topic-summary`, `detailed-attempts`, `matrix`, `submissions`)
 
 ## Dependencies
 
@@ -404,7 +408,11 @@ Ensure all required environment variables are set in `.env`:
 
 ## Recent Updates
 
-- ✅ **📋 Export by Topic**: New customizable topic-based export for instructors with selectable topics and completed/total format
+- ✅ **📤 Export Center**: Consolidated 9 scattered export routes/buttons into one Export Center page per role (`/instructor/export`, `/admin/export`). Offers four shared export types — Topic Completion Summary, Detailed Question Attempts (new: per-student-per-question attempt counts, best-match %, and scores), Student Completion Matrix, plus role-specific ER Diagram Submissions (instructor) / Instructor Directory (admin) — all filterable by academic year, semester, and course section. All completion-style CSV cells are numeric `1`/`0`, and no cell ever combines a numerator/denominator into one string (e.g. `"3/5"`) — topic/question counts are always split into separate numeric columns so the CSV imports cleanly into D2L's grade-import tool
+- ✅ **Per-Section Topic Visibility**: Instructors can now hide specific topics from individual course sections via a new Topic Settings page (accessible from the Course Sections list). Hidden topics are filtered from the student topics list and blocked at the question-list URL level
+- ✅ **Per-Section Due Dates**: Instructors can set a per-topic deadline per course section. After the deadline, queries still execute and results are shown, but completions are not recorded. Warning/danger badges appear on topic and question-list pages
+- ✅ **Solution Unlock Threshold**: The reference solution and ChatGPT comparison are hidden until a student has ≥ 5 attempts with ≥ 75% row match, or the question is already completed. The solution is also excluded from the execute API response until unlocked
+- ✅ **Fuzzy Completion**: Questions are marked complete when row count and column count both match. Column alias or ordering differences no longer block completion (they are still shown as informational differences in the UI)
 - ✅ **🤖 Enhanced AI Capabilities**: Advanced OpenAI GPT-4 and GPT-4 Vision integration for intelligent analysis
 - ✅ **🔍 AI-Powered Query Analysis**: Intelligent SQL query comparison and feedback system
 - ✅ **📊 Automated ER Diagram Evaluation**: Computer vision-based diagram analysis with detailed scoring
@@ -412,7 +420,6 @@ Ensure all required environment variables are set in `.env`:
 - ✅ **Advanced Admin Dashboard**: Enhanced user management with role-specific views and course section details
 - ✅ **Semester Tracking System**: Complete academic year and semester management with course sections
 - ✅ **Instructor Management**: Comprehensive instructor oversight with course section and student enrollment tracking
-- ✅ **Enhanced Export Capabilities**: Semester-based data export and reporting
 - ✅ **Password Reset System**: Complete password reset functionality with email verification
 - ✅ **Enhanced Security**: Improved password validation and session management
 - ✅ **Better Error Handling**: Comprehensive error handling and user feedback

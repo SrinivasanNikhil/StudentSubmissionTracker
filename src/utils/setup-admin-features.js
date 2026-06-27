@@ -13,7 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const dotenv = require("dotenv");
 const { sequelize, testConnection } = require("../config/database");
 const { User } = require("../models");

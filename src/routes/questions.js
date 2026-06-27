@@ -1,15 +1,56 @@
 const express = require("express");
 const router = express.Router();
-const { Question, Topic, Completion, User, InteractionLog } = require("../models");
+const { Question, Topic, Completion, User, InteractionLog, InstructorCourseSection, InstructorSectionTopicSetting } = require("../models");
 const { isAuthenticated } = require("../middleware/auth");
-const { executeQuery, compareQueries } = require("../services/sqlExecutor");
-const { OpenAI } = require("openai");
-const { parseString } = require("xml2js");
+const { executeQuery, compareQueries, isSelectOnly } = require("../services/sqlExecutor");
+const openai = require("../services/openai");
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-	apiKey: process.env.OPENAI_API_KEY,
-});
+// Helper: look up a student's InstructorCourseSection from session user
+async function getStudentSection(user) {
+	if (!user || !user.courseSection || !user.associatedInstructorId) return null;
+	const dashIndex = user.courseSection.indexOf("-");
+	const courseCode = dashIndex !== -1 ? user.courseSection.slice(0, dashIndex) : user.courseSection;
+	const sectionCode = dashIndex !== -1 ? user.courseSection.slice(dashIndex + 1) : "";
+	return InstructorCourseSection.findOne({
+		where: { instructorId: user.associatedInstructorId, courseCode, sectionCode, isActive: true },
+	});
+}
+
+// Helper: compute due-date status, accounting for an optional grace period
+function getDeadlineStatus(dueDate, gracePeriodMinutes) {
+	if (!dueDate) return { isPastDue: false, isPastGrace: false };
+	const due = new Date(dueDate);
+	const graceCutoff = new Date(due.getTime() + (gracePeriodMinutes || 0) * 60000);
+	const now = new Date();
+	return { isPastDue: due < now, isPastGrace: graceCutoff < now };
+}
+
+// Helper: compute solution unlock status for a user+question
+async function getSolutionUnlockStatus(userId, questionId) {
+	const existingCompletion = await Completion.findOne({ where: { userId, questionId } });
+	if (existingCompletion) return { solutionUnlocked: true, attemptCount: 0, bestRatio: 1, existingCompletion };
+
+	const attemptCount = await InteractionLog.count({
+		where: { userId, questionId, eventType: "query_attempt" },
+	});
+
+	const recentAttempts = await InteractionLog.findAll({
+		where: { userId, questionId, eventType: "query_attempt" },
+		order: [["occurred_at", "DESC"]],
+		limit: 50,
+	});
+
+	const bestRatio = recentAttempts.reduce((best, log) => {
+		const data = log.eventData || {};
+		if (data.solutionRows > 0) {
+			return Math.max(best, (data.studentRows || 0) / data.solutionRows);
+		}
+		return best;
+	}, 0);
+
+	const solutionUnlocked = attemptCount >= 5 && bestRatio >= 0.75;
+	return { solutionUnlocked, attemptCount, bestRatio, existingCompletion: null };
+}
 
 // Get questions by topic ID
 router.get("/topic/:topicId", isAuthenticated, async (req, res) => {
@@ -24,6 +65,25 @@ router.get("/topic/:topicId", isAuthenticated, async (req, res) => {
 				title: "Topic Not Found",
 				message: "The requested topic does not exist.",
 			});
+		}
+
+		// Check visibility for students in a course section
+		let topicDueDate = null;
+		let topicIsPastDue = false;
+		const sessionUser = req.session.user;
+		const studentSection = await getStudentSection(sessionUser);
+		if (studentSection) {
+			const topicSetting = await InstructorSectionTopicSetting.findOne({
+				where: { instructorCourseSectionId: studentSection.id, topicId: topic.id },
+			});
+			if (topicSetting && topicSetting.isVisible === false) {
+				req.flash("error", "That topic is not available for your course section.");
+				return res.redirect("/topics");
+			}
+			if (topicSetting && topicSetting.dueDate) {
+				topicDueDate = topicSetting.dueDate;
+				topicIsPastDue = new Date(topicSetting.dueDate) < new Date();
+			}
 		}
 
 		// Get all questions for this topic
@@ -68,6 +128,8 @@ router.get("/topic/:topicId", isAuthenticated, async (req, res) => {
 			title: `${topic.name}`,
 			topic,
 			questions: questionsWithCompletion,
+			topicDueDate,
+			topicIsPastDue,
 		});
 	} catch (error) {
 		console.error("Error fetching questions:", error);
@@ -113,12 +175,33 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 			},
 		});
 
-		const user = await User.findByPk(req.session.userId);
+		const { solutionUnlocked, attemptCount, bestRatio } = await getSolutionUnlockStatus(
+			req.session.userId,
+			id
+		);
+
+		// Prev/next navigation within the same topic
+		const topicQuestions = await Question.findAll({
+			where: { topicId: question.topicId },
+			order: [["id", "ASC"]],
+			attributes: ["id"],
+		});
+		const idx = topicQuestions.findIndex((q) => q.id === question.id);
+		const prevId = idx > 0 ? topicQuestions[idx - 1].id : null;
+		const nextId = idx < topicQuestions.length - 1 ? topicQuestions[idx + 1].id : null;
+
 		res.render("pages/question-detail", {
 			title: `Question #${question.id}`,
 			question,
 			completed: !!completion,
-			aiFeedbackEnabled: user ? user.aiFeedbackEnabled : true,
+			solutionUnlocked,
+			solutionQuery: solutionUnlocked ? (question.solution || '') : '',
+			attemptCount,
+			bestRowMatchPct: Math.round(bestRatio * 100),
+			prevId,
+			nextId,
+			questionIndex: idx + 1,
+			totalQuestions: topicQuestions.length,
 		});
 	} catch (error) {
 		console.error("Error fetching question:", error);
@@ -155,6 +238,21 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			});
 		}
 
+		// Check due date for the student's course section
+		let pastDeadline = false;
+		let pastGrace = false;
+		const execSection = await getStudentSection(req.session.user);
+		if (execSection) {
+			const deadlineSetting = await InstructorSectionTopicSetting.findOne({
+				where: { instructorCourseSectionId: execSection.id, topicId: question.topic.id },
+			});
+			if (deadlineSetting?.dueDate) {
+				const deadlineStatus = getDeadlineStatus(deadlineSetting.dueDate, deadlineSetting.gracePeriodMinutes);
+				pastDeadline = deadlineStatus.isPastDue;
+				pastGrace = deadlineStatus.isPastGrace;
+			}
+		}
+
 		// Determine the database to use
 		const databaseName = question.topic.database;
 
@@ -176,49 +274,50 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 				comparison.studentResult &&
 				comparison.solutionResult &&
 				comparison.rowsMatch && // Rows must match
-				comparison.columnsMatch && // Column count must match
-				comparison.columnNamesMatch // Column names must match
+				comparison.columnsMatch // Column count must match
 			) {
-				// Check if the user has already completed this question
-				const existingCompletion = await Completion.findOne({
-					where: {
-						userId,
-						questionId: id,
-					},
-				});
+				isCompleted = true;
 
-				// If not already completed, mark it as completed
-				if (!existingCompletion) {
-					// Get user's semester information
-					const user = await User.findByPk(userId);
-					const { InstructorCourseSection } = require("../models");
-
-					await Completion.create({
-						userId,
-						questionId: id,
-						completedAt: new Date(),
-						academicYear:
-							user.academicYear ||
-							InstructorCourseSection.getCurrentAcademicYear(),
-						semester:
-							user.semester || InstructorCourseSection.getCurrentSemester(),
-						courseSection: user.courseSection,
+				if (!pastGrace) {
+					// Check if the user has already completed this question
+					const existingCompletion = await Completion.findOne({
+						where: {
+							userId,
+							questionId: id,
+						},
 					});
 
-					console.log(
-						`✅ Question ${id} marked as completed for user ${userId} - All criteria met (rows, columns, column names)`
-					);
-				} else {
-					console.log(`ℹ️ Question ${id} already completed for user ${userId}`);
-				}
+					// If not already completed, mark it as completed
+					if (!existingCompletion) {
+						// Get user's semester information
+						const user = await User.findByPk(userId);
 
-				isCompleted = true;
+						await Completion.create({
+							userId,
+							questionId: id,
+							completedAt: new Date(),
+							academicYear:
+								user.academicYear ||
+								InstructorCourseSection.getCurrentAcademicYear(),
+							semester:
+								user.semester || InstructorCourseSection.getCurrentSemester(),
+							courseSection: user.courseSection,
+						});
+
+						console.log(
+							`✅ Question ${id} marked as completed for user ${userId} - All criteria met (rows, columns)`
+						);
+					} else {
+						console.log(`ℹ️ Question ${id} already completed for user ${userId}`);
+					}
+				} else {
+					console.log(`⏰ Question ${id} correct for user ${userId} but grace period has passed — completion not recorded`);
+				}
 			} else if (comparison && comparison.success) {
 				// Log why the question was not completed
 				const reasons = [];
 				if (!comparison.rowsMatch) reasons.push("row count mismatch");
 				if (!comparison.columnsMatch) reasons.push("column count mismatch");
-				if (!comparison.columnNamesMatch) reasons.push("column names mismatch");
 
 				console.log(
 					`❌ Question ${id} NOT completed for user ${userId} - Reasons: ${reasons.join(
@@ -228,6 +327,13 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			}
 		}
 
+		// Only expose the solution in the response if it is unlocked
+		const {
+			solutionUnlocked: execSolutionUnlocked,
+			attemptCount: execAttemptCount,
+			bestRatio: execBestRatio,
+		} = await getSolutionUnlockStatus(userId, id);
+
 		// Log the query attempt
 		const userForLog = await User.findByPk(userId);
 		await logInteraction(userId, id, "query_attempt", {
@@ -236,6 +342,9 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			rowsMatch: comparison?.rowsMatch || false,
 			columnsMatch: comparison?.columnsMatch || false,
 			columnNamesMatch: comparison?.columnNamesMatch || false,
+			studentRows: comparison?.studentResult?.rows ?? 0,
+			solutionRows: comparison?.solutionResult?.rows ?? 0,
+			isLate: pastDeadline,
 		}, userForLog);
 
 		// Return the results
@@ -243,11 +352,16 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			success: result.success,
 			executionResult: {
 				...result,
-				solution: question.solution,
+				solution: execSolutionUnlocked ? question.solution : null,
 			},
 			comparison: comparison,
 			databaseName: databaseName,
 			isCompleted: isCompleted,
+			pastDeadline: pastDeadline,
+			pastGrace: pastGrace,
+			solutionUnlocked: execSolutionUnlocked,
+			attemptCount: execAttemptCount,
+			bestRowMatchPct: Math.round(execBestRatio * 100),
 		});
 	} catch (error) {
 		console.error("Error executing SQL query:", error);
@@ -271,6 +385,16 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 router.post("/:id/analyze", isAuthenticated, async (req, res) => {
 	try {
 		const { userQuery, referenceQuery } = req.body;
+		const { id } = req.params;
+
+		// Enforce solution unlock gate
+		const { solutionUnlocked } = await getSolutionUnlockStatus(req.session.userId, id);
+		if (!solutionUnlocked) {
+			return res.status(403).json({
+				success: false,
+				message: "Solution not yet unlocked. Complete more attempts to access AI comparison.",
+			});
+		}
 
 		if (!userQuery || !referenceQuery) {
 			return res.status(400).json({
@@ -329,107 +453,64 @@ Format your response in a clear, structured way using HTML formatting.`;
 	}
 });
 
-// Real-time query analysis with rate limiting and change detection
-router.post("/:id/analyze-realtime", isAuthenticated, async (req, res) => {
+// On-demand AI syntax feedback
+router.post("/:id/analyze-syntax", isAuthenticated, async (req, res) => {
 	try {
-		console.log("🔍 Real-time analysis request received");
-		const { query, previousQuery, lastAnalysisTime } = req.body;
+		const { query } = req.body;
 		const { id } = req.params;
 		const userId = req.session.userId;
-		const user = await User.findByPk(userId);
-
-		if (!user.aiFeedbackEnabled) {
-			return res.json({ success: true, disabled: true, analysis: null });
-		}
-
-		console.log("Request details:", {
-			id,
-			userId,
-			query,
-			previousQuery,
-			lastAnalysisTime,
-		});
 
 		if (!query || query.trim() === "") {
-			console.log("❌ No query provided");
 			return res.status(400).json({
 				success: false,
 				message: "SQL query is required",
 			});
 		}
 
-		// Rate limiting: Check if enough time has passed since last analysis
-		const now = Date.now();
-		const minTimeBetweenCalls = 30000; // 30 seconds minimum between calls
-
-		if (lastAnalysisTime && now - lastAnalysisTime < minTimeBetweenCalls) {
-			console.log("⏰ Rate limit: Too soon since last analysis");
-			return res.status(429).json({
+		// Reject oversized payloads (prompt injection / token abuse)
+		if (query.length > 2000) {
+			return res.status(400).json({
 				success: false,
-				message: "Please wait before requesting another analysis",
-				retryAfter: Math.ceil(
-					(minTimeBetweenCalls - (now - lastAnalysisTime)) / 1000
-				),
+				message: "Query is too long. Please shorten your query.",
 			});
 		}
 
-		// Change detection: Only analyze if there are substantive changes
-		if (previousQuery && previousQuery.trim()) {
-			const changeThreshold = 0.3; // 30% change threshold
-			const similarity = calculateSimilarity(query, previousQuery);
-
-			if (similarity > 1 - changeThreshold) {
-				console.log(
-					"🔄 Change detection: Query too similar to previous, skipping analysis"
-				);
-				return res.json({
-					success: true,
-					analysis:
-						"<div class='text-muted'><i class='bi bi-info-circle'></i> Query hasn't changed significantly since last analysis.</div>",
-					skipped: true,
-				});
-			}
+		// Validate that the input is a SELECT statement — rejects non-SQL text and
+		// destructive statements before they ever reach the OpenAI API
+		if (!isSelectOnly(query)) {
+			return res.status(400).json({
+				success: false,
+				message: "Only SELECT queries can be analysed. Please write a SELECT statement.",
+			});
 		}
 
-		// Get the question to understand the context
 		const question = await Question.findByPk(id, {
 			include: [{ model: Topic, as: "topic" }],
 		});
 
 		if (!question) {
-			console.log("❌ Question not found:", id);
 			return res.status(404).json({
 				success: false,
 				message: "Question not found",
 			});
 		}
 
-		console.log("✅ Question found:", question.questionText);
-
-		// Create a prompt for ChatGPT
-		const prompt = `You are a terse MySQL TA helping a student for the following question:
+		const prompt = `You are a MySQL TA helping a student for the following question:
 
 Question: ${question.questionText}
 
-The student has started writing this query:
+The student has written this query:
 ${query}
 
-Provide real-time feedback on:
-1. Syntax correctness
-
-Keep the response to 128 tokens or less, focus on immediate, actionable feedback, no solution, no code.
+Provide feedback on SQL syntax correctness. Keep the response to 128 tokens or less, focus on immediate, actionable feedback. No solution, no code.
 Format the response in HTML with appropriate styling.`;
 
-		console.log("🤖 Sending request to OpenAI...");
-
-		// Get analysis from ChatGPT
 		const completion = await openai.chat.completions.create({
 			model: "gpt-4.1-nano",
 			messages: [
 				{
 					role: "system",
-					content:
-						"You are an expert MySQL tutor providing real-time feedback to students.",
+					content: "You are an expert MySQL tutor providing feedback to students.",
 				},
 				{
 					role: "user",
@@ -441,8 +522,8 @@ Format the response in HTML with appropriate styling.`;
 		});
 
 		const analysis = completion.choices[0].message.content;
-		console.log("✅ OpenAI analysis received, length:", analysis.length);
 
+		const user = await User.findByPk(userId);
 		await logInteraction(userId, id, "ai_feedback_requested", {
 			queryLength: query.length,
 			analysisLength: analysis.length,
@@ -451,11 +532,9 @@ Format the response in HTML with appropriate styling.`;
 		return res.json({
 			success: true,
 			analysis: analysis,
-			analysisTime: now,
-			queryHash: hashQuery(query),
 		});
 	} catch (error) {
-		console.error("❌ Error analyzing query:", error);
+		console.error("Error analyzing query:", error);
 		return res.status(500).json({
 			success: false,
 			message: "Error analyzing query",

@@ -1,114 +1,78 @@
-<!-- Debug Information -->
-<div style="display: none;">
-    <!-- Debug info will be visible in page source -->
-    <pre>
-            Session ID: <%= locals.sessionID %>
-            User object: <%= JSON.stringify(locals.user, null, 2) %>
-            isAdmin type: <%= typeof locals.user?.isAdmin %>
-            isAdmin value: <%= locals.user?.isAdmin %>
-            isAuthenticated: <%= locals.isAuthenticated %>
-            Session Cookie: <%= locals.sessionCookie %>
-        </pre>
-</div>
-
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand" href="/">Student Submission Tracker</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <a class="navbar-brand" href="/">
+            <span class="navbar-brand-icon">NS</span>
+            SQL Practice
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto">
                 <% if (locals.user) { %>
                     <li class="nav-item">
-                        <a class="nav-link" href="/topics">Topics</a>
+                        <a class="nav-link <%= locals.currentPath === '/topics' ? 'active' : '' %>"
+                           href="/topics">Topics</a>
                     </li>
-                    <% } %>
+                <% } %>
             </ul>
-            <ul class="navbar-nav">
+            <ul class="navbar-nav align-items-center gap-1">
                 <% if (locals.user) { %>
-                    <% if (locals.user.isAdmin===true || locals.user.role==='admin' ) { %>
-                        <!-- Admin Navigation -->
+                    <% if (locals.user.isAdmin===true || locals.user.role==='admin') { %>
                         <li class="nav-item">
-                            <a class="nav-link" href="/admin" title="Admin Dashboard">
-                                <i class="bi bi-speedometer2 me-1"></i>Dashboard
-                            </a>
+                            <a class="nav-link <%= locals.currentPath && locals.currentPath.startsWith('/admin') ? 'active' : '' %>"
+                               href="/admin">Dashboard</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/admin/users" title="User Management">
-                                <i class="bi bi-people me-1"></i>Users
-                            </a>
+                            <a class="nav-link <%= locals.currentPath === '/admin/users' ? 'active' : '' %>"
+                               href="/admin/users">Users</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/admin/instructors" title="Instructor Management">
-                                <i class="bi bi-person-workspace me-1"></i>Instructors
-                            </a>
+                            <a class="nav-link <%= locals.currentPath === '/admin/instructors' ? 'active' : '' %>"
+                               href="/admin/instructors">Instructors</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/er-diagrams/admin/submissions" title="ER Diagram Submissions">
-                                <i class="bi bi-diagram-3 me-1"></i>Submissions
-                            </a>
+                            <a class="nav-link <%= locals.currentPath && locals.currentPath.startsWith('/er-diagrams') ? 'active' : '' %>"
+                               href="/er-diagrams/admin/submissions">Submissions</a>
+                        </li>
+                    <% } else if (locals.user.role==='instructor') { %>
+                        <li class="nav-item">
+                            <a class="nav-link <%= locals.currentPath && locals.currentPath.startsWith('/instructor') ? 'active' : '' %>"
+                               href="/instructor/dashboard">Dashboard</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/profile" title="Profile">
-                                <i class="bi bi-person me-1"></i>
-                                <%= locals.user.firstName %>
-                            </a>
+                            <a class="nav-link <%= locals.currentPath === '/instructor/students' ? 'active' : '' %>"
+                               href="/instructor/students">Students</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/auth/logout" title="Logout">
-                                <i class="bi bi-box-arrow-right me-1"></i>Logout
-                            </a>
+                            <a class="nav-link <%= locals.currentPath === '/instructor/submissions' ? 'active' : '' %>"
+                               href="/instructor/submissions">Submissions</a>
                         </li>
-                        <% } else if (locals.user.role==='instructor' ) { %>
-                            <!-- Instructor Navigation -->
-                            <li class="nav-item">
-                                <a class="nav-link" href="/instructor/dashboard" title="Instructor Dashboard">
-                                    <i class="bi bi-speedometer2 me-1"></i>Dashboard
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/instructor/students" title="My Students">
-                                    <i class="bi bi-people me-1"></i>Students
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/instructor/submissions" title="ER Diagram Submissions">
-                                    <i class="bi bi-diagram-3 me-1"></i>Submissions
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/profile" title="Profile">
-                                    <i class="bi bi-person me-1"></i>
-                                    <%= locals.user.firstName %>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/auth/logout" title="Logout">
-                                    <i class="bi bi-box-arrow-right me-1"></i>Logout
-                                </a>
-                            </li>
-                            <% } else { %>
-                                <!-- Student Navigation -->
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/profile">
-                                        <%= locals.user.firstName %>
-                                            <%= locals.user.lastName %>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="/auth/logout">Logout</a>
-                                </li>
-                                <% } %>
-                                    <% } else { %>
-                                        <!-- Guest Navigation -->
-                                        <li class="nav-item">
-                                            <a class="nav-link" href="/auth/login">Login</a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a class="nav-link" href="/auth/register">Register</a>
-                                        </li>
-                                        <% } %>
+                    <% } %>
+                    <li class="nav-item ms-2">
+                        <a href="/profile" class="nav-link p-0"
+                           title="<%= locals.user.firstName %> <%= locals.user.lastName %>">
+                            <span class="nav-avatar">
+                                <%= locals.user.firstName ? locals.user.firstName.charAt(0).toUpperCase() : '' %><%= locals.user.lastName ? locals.user.lastName.charAt(0).toUpperCase() : '' %>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/auth/logout" style="color: var(--muted) !important;"
+                           title="Logout">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </a>
+                    </li>
+                <% } else { %>
+                    <li class="nav-item">
+                        <a class="nav-link <%= locals.currentPath === '/auth/login' ? 'active' : '' %>"
+                           href="/auth/login">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-primary btn-sm ms-2 px-3" href="/auth/register">Register</a>
+                    </li>
+                <% } %>
             </ul>
         </div>
     </div>

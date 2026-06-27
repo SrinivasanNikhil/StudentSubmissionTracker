@@ -2,16 +2,33 @@
     <div class="mx-auto" style="max-width: 1200px; margin-left: 2rem; margin-right: 2rem;">
         <!-- Breadcrumb Navigation -->
         <nav aria-label="breadcrumb" class="mb-4">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/topics">Topics</a></li>
-                <li class="breadcrumb-item">
-                    <a href="/questions/topic/<%= question.topicId %>">
-                        <%= question.topic.name %>
-                    </a>
-                </li>
-                <li class="breadcrumb-item active" aria-current="page">Question #<%= question.id %>
-                </li>
-            </ol>
+            <div class="d-flex align-items-center justify-content-between">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="/topics">Topics</a></li>
+                    <li class="breadcrumb-item">
+                        <a href="/questions/topic/<%= question.topicId %>"><%= question.topic.name %></a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">
+                        Q<%= questionIndex %> of <%= totalQuestions %>
+                    </li>
+                </ol>
+                <div class="d-flex gap-2">
+                    <% if (typeof prevId !== 'undefined' && prevId) { %>
+                        <a href="/questions/<%= prevId %>"
+                           class="btn btn-sm btn-outline-secondary"
+                           title="Previous question">
+                            <i class="bi bi-chevron-left"></i> Prev
+                        </a>
+                    <% } %>
+                    <% if (typeof nextId !== 'undefined' && nextId) { %>
+                        <a href="/questions/<%= nextId %>"
+                           class="btn btn-sm btn-outline-secondary"
+                           title="Next question">
+                            Next <i class="bi bi-chevron-right"></i>
+                        </a>
+                    <% } %>
+                </div>
+            </div>
         </nav>
 
         <!-- Question Card -->
@@ -21,10 +38,32 @@
                     <i class="bi bi-question-circle me-2"></i>
                     Question #<%= question.id %>
                 </h4>
-                <span class="badge <%= completed ? 'bg-success' : 'bg-secondary' %> rounded-pill" id="completion-badge">
-                    <i class="bi <%= completed ? 'bi-check-circle' : 'bi-circle' %> me-1"></i>
-                    <%= completed ? 'Completed' : 'Not Completed' %>
-                </span>
+                <div class="d-flex align-items-center gap-2">
+                    <% if (completed) { %>
+                        <span class="badge rounded-pill px-3 py-2 completion-badge-complete"
+                              id="completion-badge">
+                            <i class="bi bi-check-circle-fill me-1"></i> Completed
+                        </span>
+                    <% } else if (!solutionUnlocked) { %>
+                        <span class="badge rounded-pill px-3 py-2 completion-badge-incomplete"
+                              id="completion-badge">
+                            <i class="bi bi-circle me-1"></i> Not completed
+                        </span>
+                        <span class="text-muted small" id="unlock-progress-label"
+                              title="Attempt at least 5 times with 75%+ row match to unlock the solution">
+                            <i class="bi bi-lock me-1"></i>
+                            Solution: <%= attemptCount %>/5 attempts<% if (attemptCount > 0) { %>, <%= bestRowMatchPct %>% match<% } %>
+                        </span>
+                    <% } else { %>
+                        <span class="badge rounded-pill px-3 py-2 completion-badge-incomplete"
+                              id="completion-badge">
+                            <i class="bi bi-circle me-1"></i> Not completed
+                        </span>
+                        <span class="text-muted small" id="unlock-progress-label">
+                            <i class="bi bi-unlock me-1"></i> Solution unlocked
+                        </span>
+                    <% } %>
+                </div>
             </div>
             <div class="card-body">
                 <h5 class="card-title text-muted">
@@ -35,34 +74,33 @@
                     <%= question.questionText %>
                 </p>
 
-                <div class="mt-4">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Questions are automatically marked as completed when your query returns the same number
-                        of rows as the reference solution.
+                <div class="mt-4" id="completion-rules-alert">
+                    <div class="alert alert-info alert-dismissible d-flex align-items-start gap-2" role="alert"
+                         style="font-size:0.875rem;">
+                        <i class="bi bi-info-circle-fill flex-shrink-0 mt-1"></i>
+                        <div>
+                            Marked complete when your query returns the same number of rows <em>and</em> columns as the reference.
+                            Column aliases and ordering don't matter.
+                        </div>
+                        <button type="button" class="btn-close ms-auto flex-shrink-0"
+                                onclick="dismissRulesAlert()" aria-label="Close"></button>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- AI Feedback Toggle -->
-        <div class="card mb-3 shadow-sm" id="ai-toggle-card">
-            <div class="card-body py-2 d-flex align-items-center justify-content-between">
-                <div>
-                    <i class="bi bi-robot me-2"></i>
-                    <strong>Real-time AI Feedback</strong>
-                    <span class="text-muted ms-2" style="font-size:0.875rem;">
-                        Toggle whether AI provides hints as you write your query
-                    </span>
-                </div>
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" id="aiFeedbackToggle"
-                           <%= aiFeedbackEnabled ? 'checked' : '' %>
-                           style="width:3em; height:1.5em; cursor:pointer;">
-                    <label class="form-check-label ms-2" for="aiFeedbackToggle" id="aiFeedbackToggleLabel">
-                        <%= aiFeedbackEnabled ? 'Enabled' : 'Disabled' %>
-                    </label>
-                </div>
+                <script>
+                function dismissRulesAlert() {
+                    document.getElementById('completion-rules-alert').style.display = 'none';
+                    try { localStorage.setItem('sst_rules_dismissed', '1'); } catch(e) {}
+                }
+                document.addEventListener('DOMContentLoaded', function() {
+                    try {
+                        if (localStorage.getItem('sst_rules_dismissed') === '1') {
+                            const el = document.getElementById('completion-rules-alert');
+                            if (el) el.style.display = 'none';
+                        }
+                    } catch(e) {}
+                });
+                </script>
             </div>
         </div>
 
@@ -78,115 +116,91 @@
                 <div class="row g-4">
                     <!-- Query Editor Column -->
                     <div class="col-md-8">
-                        <!-- Database Schema Info -->
-                        <div class="schema-info mb-4">
-                            <div class="alert alert-secondary mb-0" role="button" data-bs-toggle="collapse"
-                                data-bs-target="#schemaDetails">
-                                <i class="bi bi-info-circle me-2"></i>
-                                Click to view <%= question.topic.database %> database tables and their schemas
-                            </div>
-                            <div class="collapse mt-3" id="schemaDetails">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h6 class="text-muted mb-3">
-                                            <i class="bi bi-database me-2"></i>
-                                            Database: <%= question.topic.database %>
-                                        </h6>
-                                        <% if (question.topic.database==='ClassicModels' ) { %>
-                                            <pre class="bg-light p-3 rounded"><code>
-Customers (customerNumber, customerName, contactLastName, contactFirstName, phone, addressLine1, addressLine2, city, state, postalCode, country, salesRepEmployeeNumber, creditLimit)
-Employees (employeeNumber, lastName, firstName, extension, email, officeCode, reportsTo, jobTitle)
-Offices (officeCode, city, phone, addressLine1, addressLine2, state, country, postalCode, territory)
-Orders (orderNumber, orderDate, requiredDate, shippedDate, status, comments, customerNumber)
-OrderDetails (orderNumber, productCode, quantityOrdered, priceEach, orderLineNumber)
-Payments (customerNumber, checkNumber, paymentDate, amount)
-Products (productCode, productName, productLine, productScale, productVendor, productDescription, quantityInStock, buyPrice, MSRP)
-ProductLines (productLine, textDescription, htmlDescription, image)
-                                            </code></pre>
-                                            <% } else if (question.topic.database==='Text' ) { %>
-                                                <pre class="bg-light p-3 rounded"><code>
-shr (shrcode, shrfirm, shrprice, shrqty, shrdiv, shrpe)
-share (shrcode, shrfirm, shrprice, shrqty, shrdiv, shrpe)
-stock (stkcode, stkfirm, stkprice, stkqty, stkdiv, stkpe, natcode)
-stockvalue (stkfirm, stkprice, stkqty, exchrate, stkvalue)
-emp (empno, empfname, empsalary, deptname, bossno)
-dept (deptname, deptfloor, deptphone, empno)
-product (prodid, proddesc, prodcost, prodprice)
-sale (saleno, saledate, saletext)
-lineitem (lineno, lineqty, lineprice, saleno, itemno)
-item (itemno, itemname, itemtype, itemcolor)
-nation (natcode, natname, exchrate)
-person (personid, person first, person last)
-car (carid, carcost, carsell, cartype, personid)
-                                            </code></pre>
-                                                <% } else { %>
-                                                    <pre class="bg-light p-3 rounded"><code>
-Categories (CategoryID, CategoryName, Description, Picture)
-Customers (CustomerID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax)
-Employees (EmployeeID, LastName, FirstName, Title, TitleOfCourtesy, BirthDate, HireDate, Address, City, Region, PostalCode, Country, HomePhone, Extension, Photo, Notes, ReportsTo, PhotoPath)
-EmployeeTerritories (EmployeeID, TerritoryID)
-Order Details (OrderID, ProductID, UnitPrice, Quantity, Discount)
-Orders (OrderID, CustomerID, EmployeeID, OrderDate, RequiredDate, ShippedDate, ShipVia, Freight, ShipName, ShipAddress, ShipCity, ShipRegion, ShipPostalCode, ShipCountry)
-Products (ProductID, ProductName, SupplierID, CategoryID, QuantityPerUnit, UnitPrice, UnitsInStock, UnitsOnOrder, ReorderLevel, Discontinued)
-Region (RegionID, RegionDescription)
-Shippers (ShipperID, CompanyName, Phone)
-Suppliers (SupplierID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax, HomePage)
-Territories (TerritoryID, TerritoryDescription, RegionID)
-                                            </code></pre>
-                                                    <% } %>
-                                    </div>
-                                </div>
-                            </div>
+                        <!-- Database info + schema modal trigger -->
+                        <div class="mb-3 d-flex align-items-center gap-2">
+                            <span class="text-muted small">
+                                <i class="bi bi-database me-1"></i>
+                                Database: <strong><%= question.topic.database %></strong>
+                            </span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0"
+                                    data-bs-toggle="modal" data-bs-target="#schemaModal"
+                                    style="font-size:12px;">
+                                <i class="bi bi-table me-1"></i>View Schema
+                            </button>
                         </div>
 
                         <div class="form-group mb-3">
                             <label for="sqlQuery" class="form-label">Your SQL Query</label>
-                            <textarea class="form-control code-editor" id="sqlQuery" rows="6"
-                                placeholder="Enter your SQL query here..."></textarea>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button id="executeQueryBtn" class="btn btn-primary">
-                                <i class="bi bi-play-fill me-2"></i> Execute Query
-                            </button>
-                            <button id="clearQueryBtn" class="btn btn-outline-secondary">
-                                <i class="bi bi-eraser me-2"></i> Clear
-                            </button>
+                            <div class="sql-editor-wrapper">
+                                <textarea class="code-editor" id="sqlQuery" rows="8"
+                                    placeholder="-- Write your SQL query here..."></textarea>
+                                <div class="sql-editor-toolbar">
+                                    <button id="executeQueryBtn" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-play-fill me-2"></i> Execute Query
+                                    </button>
+                                    <button id="clearQueryBtn" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-eraser me-2"></i> Clear
+                                    </button>
+                                    <button id="aiFeedbackBtn" type="button" class="btn btn-sm btn-outline-info ms-2">
+                                        <i class="bi bi-robot me-1"></i> Get AI Feedback
+                                    </button>
+                                    <span class="ms-auto text-muted small" id="query-char-count" style="color:#8888aa !important;"></span>
+                                    <span style="color:#6c6fc4; font-size:11px; margin-left:8px; flex-shrink:0;">
+                                        <kbd style="background:#2a2a4a; border:1px solid #3a3a5c; border-radius:3px; padding:1px 5px; font-size:10px; color:#a0a0c0;">Ctrl</kbd>
+                                        +
+                                        <kbd style="background:#2a2a4a; border:1px solid #3a3a5c; border-radius:3px; padding:1px 5px; font-size:10px; color:#a0a0c0;">↵</kbd>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Real-time Feedback Column -->
+                    <!-- AI Feedback Column -->
                     <div class="col-md-4">
                         <div class="card h-100 shadow-sm">
-                            <div class="card-header bg-primary text-white">
+                            <div class="card-header" style="background:linear-gradient(135deg, #4f46e5, #7c3aed); color:#fff;">
                                 <h6 class="mb-0">
-                                    <i class="bi bi-robot me-2"></i>
-                                    AI Assistant - Real-time Feedback
-                                    <span id="analysis-status" class="badge bg-light text-dark ms-2">Ready</span>
+                                    <i class="bi bi-robot me-2"></i>AI Feedback
                                 </h6>
                             </div>
                             <div class="card-body">
                                 <div id="realtime-feedback">
-                                    <div class="text-muted">
-                                        <i class="bi bi-robot"></i> Start typing a SQL query to get real-time
-                                        feedback...
+                                    <div class="text-muted small">
+                                        <i class="bi bi-robot me-2"></i>
+                                        Click <strong>Get AI Feedback</strong> in the toolbar for syntax hints on your current query.
                                     </div>
                                 </div>
                                 <div id="realtime-loading" style="display: none;">
-                                    <div class="d-flex align-items-center">
-                                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
                                             <span class="visually-hidden">Loading...</span>
                                         </div>
-                                        <small class="text-muted">Analyzing your query...</small>
+                                        <small class="text-muted">Analyzing...</small>
                                     </div>
                                 </div>
-                                <!-- Countdown timer for rate limiting -->
-                                <div id="countdown-timer" style="display: none;" class="mt-2">
-                                    <small class="text-muted">
-                                        <i class="bi bi-clock"></i> Next analysis available in <span
-                                            id="countdown-seconds">30</span> seconds
-                                    </small>
+                            </div>
+                            <% if (solutionUnlocked) { %>
+                            <div class="card-footer bg-transparent border-top pt-2">
+                                <div id="reference-query-container" style="display:none;">
+                                    <pre class="bg-light p-2 rounded mb-2" style="font-size:12px;"><code id="reference-query"><%= solutionQuery %></code></pre>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="showReferenceQueryBtn">
+                                        <i class="bi bi-code-square me-1"></i>
+                                        <span id="showReferenceQueryLabel">Show solution</span>
+                                    </button>
+                                    <button id="compareWithChatGPT" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-robot me-1"></i>Compare with AI
+                                    </button>
+                                </div>
+                                <div id="chatgpt-analysis" class="mt-3" style="display:none;">
+                                    <div id="chatgpt-loading" class="text-center" style="display:none;">
+                                        <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                                    </div>
+                                    <div id="chatgpt-content"></div>
                                 </div>
                             </div>
+                            <% } %>
                         </div>
                     </div>
                 </div>
@@ -226,42 +240,17 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                     <div id="feedback-box" class="alert mb-3" role="alert"></div>
 
                     <div id="differences-container">
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="showReferenceQuery">
-                                <label class="form-check-label" for="showReferenceQuery">
-                                    Show Reference Query
-                                </label>
-                            </div>
-                        </div>
-                        <div id="reference-query-container" style="display: none;">
-                            <h6 class="text-muted mb-3">
-                                <i class="bi bi-code-square me-2"></i>
-                                Reference Query:
-                            </h6>
-                            <pre class="bg-light p-3 rounded"><code id="reference-query"></code></pre>
-                            <div class="mt-3">
-                                <button id="compareWithChatGPT" class="btn btn-primary btn-sm">
-                                    <i class="bi bi-robot me-2"></i>
-                                    Compare with ChatGPT
-                                </button>
-                            </div>
-                            <div id="chatgpt-analysis" class="mt-3" style="display: none;">
-                                <h6 class="text-muted mb-3">
-                                    <i class="bi bi-robot me-2"></i>
-                                    ChatGPT Analysis:
-                                </h6>
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div id="chatgpt-loading" class="text-center" style="display: none;">
-                                            <div class="spinner-border text-primary" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                        </div>
-                                        <div id="chatgpt-content"></div>
-                                    </div>
-                                </div>
-                            </div>
+                        <!-- Solution section: always rendered; only used for unlock state tracking -->
+                        <div id="solution-section" <% if (!solutionUnlocked) { %>style="display:none"<% } %>></div>
+                        <!-- Lock notice: always rendered; hidden via CSS when unlocked on load -->
+                        <div id="solution-lock-notice" class="alert alert-secondary mb-3" <% if (solutionUnlocked) { %>style="display:none"<% } %>>
+                            <i class="bi bi-lock me-2"></i>
+                            <strong>Solution locked.</strong>
+                            Complete at least 5 attempts with at least 75% of the expected rows matched to unlock the solution.
+                            <br><small class="text-muted">
+                                Current progress: <%= attemptCount %> attempt<%= attemptCount !== 1 ? 's' : '' %>,
+                                best row match: <%= bestRowMatchPct %>%
+                            </small>
                         </div>
                         <h6 class="text-muted mb-3">
                             <i class="bi bi-list-check me-2"></i>
@@ -282,53 +271,73 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
     </div>
 </div>
 
-<!-- Hidden field with question ID for JavaScript -->
+<!-- Schema Modal -->
+<div class="modal fade" id="schemaModal" tabindex="-1" aria-labelledby="schemaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="schemaModalLabel">
+                    <i class="bi bi-database me-2"></i>
+                    <%= question.topic.database %> Schema
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <% if (question.topic.database === 'ClassicModels') { %>
+                    <pre class="bg-light p-3 rounded" style="font-size:13px;"><code>Customers (customerNumber, customerName, contactLastName, contactFirstName, phone,
+           addressLine1, addressLine2, city, state, postalCode, country,
+           salesRepEmployeeNumber, creditLimit)
+Employees (employeeNumber, lastName, firstName, extension, email,
+           officeCode, reportsTo, jobTitle)
+Offices   (officeCode, city, phone, addressLine1, addressLine2,
+           state, country, postalCode, territory)
+Orders    (orderNumber, orderDate, requiredDate, shippedDate, status,
+           comments, customerNumber)
+OrderDetails (orderNumber, productCode, quantityOrdered, priceEach, orderLineNumber)
+Payments  (customerNumber, checkNumber, paymentDate, amount)
+Products  (productCode, productName, productLine, productScale, productVendor,
+           productDescription, quantityInStock, buyPrice, MSRP)
+ProductLines (productLine, textDescription, htmlDescription, image)</code></pre>
+                <% } else if (question.topic.database === 'Text') { %>
+                    <pre class="bg-light p-3 rounded" style="font-size:13px;"><code>shr (shrcode, shrfirm, shrprice, shrqty, shrdiv, shrpe)
+share (shrcode, shrfirm, shrprice, shrqty, shrdiv, shrpe)
+stock (stkcode, stkfirm, stkprice, stkqty, stkdiv, stkpe, natcode)
+stockvalue (stkfirm, stkprice, stkqty, exchrate, stkvalue)
+emp (empno, empfname, empsalary, deptname, bossno)
+dept (deptname, deptfloor, deptphone, empno)
+product (prodid, proddesc, prodcost, prodprice)
+sale (saleno, saledate, saletext)
+lineitem (lineno, lineqty, lineprice, saleno, itemno)
+item (itemno, itemname, itemtype, itemcolor)
+nation (natcode, natname, exchrate)
+person (personid, person first, person last)
+car (carid, carcost, carsell, cartype, personid)</code></pre>
+                <% } else { %>
+                    <pre class="bg-light p-3 rounded" style="font-size:13px;"><code>Categories (CategoryID, CategoryName, Description, Picture)
+Customers (CustomerID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax)
+Employees (EmployeeID, LastName, FirstName, Title, TitleOfCourtesy, BirthDate, HireDate, Address, City, Region, PostalCode, Country, HomePhone, Extension, Photo, Notes, ReportsTo, PhotoPath)
+EmployeeTerritories (EmployeeID, TerritoryID)
+Order Details (OrderID, ProductID, UnitPrice, Quantity, Discount)
+Orders (OrderID, CustomerID, EmployeeID, OrderDate, RequiredDate, ShippedDate, ShipVia, Freight, ShipName, ShipAddress, ShipCity, ShipRegion, ShipPostalCode, ShipCountry)
+Products (ProductID, ProductName, SupplierID, CategoryID, QuantityPerUnit, UnitPrice, UnitsInStock, UnitsOnOrder, ReorderLevel, Discontinued)
+Region (RegionID, RegionDescription)
+Shippers (ShipperID, CompanyName, Phone)
+Suppliers (SupplierID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax, HomePage)
+Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden fields for JavaScript -->
 <input type="hidden" id="questionId" value="<%= question.id %>">
+<input type="hidden" id="solutionUnlocked" value="<%= solutionUnlocked %>">
 
-<style>
-    .code-editor {
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 14px;
-        line-height: 1.5;
-    }
-
-    .schema-info pre {
-        margin-bottom: 0;
-    }
-
-    .card {
-        border-radius: 0.5rem;
-    }
-
-    .alert {
-        border-radius: 0.5rem;
-    }
-
-    .table {
-        border-radius: 0.5rem;
-        overflow: hidden;
-    }
-</style>
 
 <!-- JavaScript for SQL Editor -->
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // AI Feedback Toggle
-        const toggle = document.getElementById('aiFeedbackToggle');
-        const label = document.getElementById('aiFeedbackToggleLabel');
-
-        toggle.addEventListener('change', async function () {
-            label.textContent = this.checked ? 'Enabled' : 'Disabled';
-            try {
-                await fetch('/profile/toggle-ai-feedback', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            } catch (e) {
-                console.error('Failed to save AI feedback preference:', e);
-            }
-        });
-
         const sqlQuery = document.getElementById('sqlQuery');
         const executeBtn = document.getElementById('executeQueryBtn');
         const clearBtn = document.getElementById('clearQueryBtn');
@@ -342,17 +351,13 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
         const differencesList = document.getElementById('differences-list');
         const differencesContainer = document.getElementById('differences-container');
         const completionBadge = document.getElementById('completion-badge');
-        const showReferenceQuery = document.getElementById('showReferenceQuery');
+        let solutionUnlocked = document.getElementById('solutionUnlocked')?.value === 'true';
         const referenceQueryContainer = document.getElementById('reference-query-container');
         const referenceQueryElement = document.getElementById('reference-query');
         const compareWithChatGPTBtn = document.getElementById('compareWithChatGPT');
         const chatgptAnalysis = document.getElementById('chatgpt-analysis');
         const chatgptLoading = document.getElementById('chatgpt-loading');
         const chatgptContent = document.getElementById('chatgpt-content');
-        const analysisStatusBadge = document.getElementById('analysis-status');
-        const countdownTimer = document.getElementById('countdown-timer');
-        const countdownSeconds = document.getElementById('countdown-seconds');
-
         // Execute query button click
         executeBtn.addEventListener('click', async function () {
             const query = sqlQuery.value.trim();
@@ -367,7 +372,7 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
             try {
                 // Show loading state
                 executeBtn.disabled = true;
-                executeBtn.innerHTML = '<i class="bi bi-hourglass"></i> Executing...';
+                executeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Running...';
                 executionStatus.className = 'alert alert-info';
                 executionStatus.textContent = 'Executing your query...';
                 resultsSection.style.display = 'block';
@@ -393,9 +398,6 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                 // Always show the results section and execution status
                 resultsSection.style.display = 'block';
                 executionStatus.style.display = 'block';
-
-                // Log the result for debugging
-                console.log('Query execution result:', result);
 
                 if (!result.success) {
                     // Handle API-level error
@@ -529,11 +531,13 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                     differencesContainer.style.display = 'block';
                     differencesList.innerHTML = '';
 
-                    // Set the reference query
-                    if (result.executionResult && result.executionResult.solution) {
-                        referenceQueryElement.textContent = result.executionResult.solution;
-                    } else {
-                        referenceQueryElement.textContent = 'Reference query not available';
+                    // Set the reference query (only if solution is unlocked)
+                    if (solutionUnlocked && referenceQueryElement) {
+                        if (result.executionResult && result.executionResult.solution) {
+                            referenceQueryElement.textContent = result.executionResult.solution;
+                        } else {
+                            referenceQueryElement.textContent = 'Reference query not available';
+                        }
                     }
 
                     // Add a header to summarize what matched/didn't match
@@ -580,13 +584,121 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                 }
 
                 // Handle completion status update
-                if (result.isCompleted) {
-                    completionBadge.className = 'badge bg-success';
-                    completionBadge.textContent = 'Completed';
+                if (result.isCompleted && !result.pastDeadline) {
+                    // Update badge
+                    const badge = document.getElementById('completion-badge');
+                    if (badge) {
+                        badge.className = 'badge rounded-pill px-3 py-2 completion-badge-complete';
+                        badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Completed';
+                    }
+                    // Hide the unlock progress label
+                    const unlockLabel = document.getElementById('unlock-progress-label');
+                    if (unlockLabel) unlockLabel.style.display = 'none';
 
-                    // Add a success message about completion
-                    if (execResult.success && feedbackBox) {
-                        feedbackBox.innerHTML += '<br><strong>Great job!</strong> This question has been marked as completed.';
+                    window.sstToast('success', '✓ Question completed! Nice work.', 6000);
+
+                    feedbackBox.className = 'alert mb-3';
+                    feedbackBox.style.cssText = 'background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d;';
+                    feedbackBox.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i><strong>Question completed.</strong> Your query matches the expected output.<% if (typeof nextId !== "undefined" && nextId) { %> <a href="/questions/<%= nextId %>" class="ms-2 fw-medium" style="color:#15803d;">Next question →</a><% } %>';
+                }
+
+                // Handle past-deadline notices
+                if (result.pastDeadline && feedbackBox) {
+                    const sep = feedbackBox.innerHTML ? '<br>' : '';
+                    if (result.isCompleted) {
+                        feedbackBox.innerHTML += sep + '<span class="text-warning"><i class="bi bi-clock-history me-1"></i>Your query is correct, but the deadline for this topic has passed. Your answer was not counted toward your completion record.</span>';
+                    } else {
+                        feedbackBox.innerHTML += sep + '<span class="text-secondary"><i class="bi bi-clock-history me-1"></i>This topic\'s deadline has passed. You can continue to practice, but completions are no longer recorded.</span>';
+                    }
+                }
+
+                // Update solution unlock state after every execute
+                if (result.solutionUnlocked !== undefined) {
+                    const lockNotice = document.getElementById('solution-lock-notice');
+                    const solutionSection = document.getElementById('solution-section');
+                    const solutionUnlockedInput = document.getElementById('solutionUnlocked');
+
+                    if (result.solutionUnlocked && !solutionUnlocked) {
+                        // Transition: locked → unlocked
+                        solutionUnlocked = true;
+                        if (solutionUnlockedInput) solutionUnlockedInput.value = 'true';
+                        if (lockNotice) lockNotice.style.display = 'none';
+                        if (solutionSection) solutionSection.style.display = '';
+                        // Inject the solution footer into the AI panel card if it isn't there yet
+                        const aiCard = document.querySelector('.col-md-4 .card');
+                        if (aiCard && !document.getElementById('showReferenceQueryBtn')) {
+                            const footer = document.createElement('div');
+                            footer.className = 'card-footer bg-transparent border-top pt-2';
+                            const solution = (result.executionResult && result.executionResult.solution) || '';
+                            footer.innerHTML = `
+                                <div id="reference-query-container" style="display:none;">
+                                    <pre class="bg-light p-2 rounded mb-2" style="font-size:12px;"><code id="reference-query">${solution.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="showReferenceQueryBtn">
+                                        <i class="bi bi-code-square me-1"></i>
+                                        <span id="showReferenceQueryLabel">Show solution</span>
+                                    </button>
+                                    <button id="compareWithChatGPT" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-robot me-1"></i>Compare with AI
+                                    </button>
+                                </div>
+                                <div id="chatgpt-analysis" class="mt-3" style="display:none;">
+                                    <div id="chatgpt-loading" class="text-center" style="display:none;"></div>
+                                    <div id="chatgpt-content"></div>
+                                </div>`;
+                            aiCard.appendChild(footer);
+                            // Wire up the newly-injected button listeners
+                            document.getElementById('showReferenceQueryBtn').addEventListener('click', async function() {
+                                const rc = document.getElementById('reference-query-container');
+                                const lbl = document.getElementById('showReferenceQueryLabel');
+                                const isVis = rc.style.display !== 'none';
+                                rc.style.display = isVis ? 'none' : 'block';
+                                if (lbl) lbl.textContent = isVis ? 'Show solution' : 'Hide solution';
+                                if (!isVis && !revealLogged) {
+                                    revealLogged = true;
+                                    try { await fetch(`/questions/${questionId}/log-reveal`, { method: 'POST' }); } catch(e) {}
+                                }
+                            });
+                            document.getElementById('compareWithChatGPT').addEventListener('click', async function() {
+                                const uq = sqlQuery.value.trim();
+                                const rq = document.getElementById('reference-query').textContent;
+                                if (!uq || !rq) { window.sstToast('error', 'Both queries are required for comparison'); return; }
+                                const cgLoad = document.getElementById('chatgpt-loading');
+                                const cgContent = document.getElementById('chatgpt-content');
+                                const cgAnalysis = document.getElementById('chatgpt-analysis');
+                                try {
+                                    cgLoad.style.display = 'block'; cgContent.innerHTML = ''; cgAnalysis.style.display = 'block';
+                                    const r = await fetch(`/questions/${questionId}/analyze`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userQuery: uq, referenceQuery: rq}) });
+                                    const data = await r.json();
+                                    cgContent.innerHTML = data.success ? data.analysis : `<div class="alert alert-danger">${data.message || 'Failed'}</div>`;
+                                } catch(e) { cgContent.innerHTML = '<div class="alert alert-danger">Failed. Please try again.</div>'; }
+                                finally { cgLoad.style.display = 'none'; }
+                            });
+                        }
+                        // Update header unlock label
+                        const unlockLabel = document.getElementById('unlock-progress-label');
+                        if (unlockLabel) {
+                            unlockLabel.innerHTML = '<i class="bi bi-unlock me-1"></i>Solution unlocked';
+                        }
+                    } else if (!result.solutionUnlocked) {
+                        // Still locked: update progress counter
+                        if (lockNotice) {
+                            const progressText = lockNotice.querySelector('small');
+                            if (progressText) {
+                                const count = result.attemptCount || 0;
+                                const pct = result.bestRowMatchPct || 0;
+                                progressText.textContent =
+                                    `Current progress: ${count} attempt${count !== 1 ? 's' : ''}, best row match: ${pct}%`;
+                            }
+                        }
+                        // Update header unlock label
+                        const unlockLabel = document.getElementById('unlock-progress-label');
+                        if (unlockLabel) {
+                            const count = result.attemptCount || 0;
+                            const pct = result.bestRowMatchPct || 0;
+                            unlockLabel.innerHTML = `<i class="bi bi-lock me-1"></i>Solution: ${count}/5 attempts${count > 0 ? ', ' + pct + '% match' : ''}`;
+                        }
                     }
                 }
 
@@ -595,9 +707,9 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
                 executionStatus.className = 'alert alert-danger';
                 executionStatus.textContent = 'An error occurred while executing the query. Please try again.';
             } finally {
-                // Reset button state
+                // Reset button state — must match markup in sql-editor-toolbar above
                 executeBtn.disabled = false;
-                executeBtn.innerHTML = '<i class="bi bi-play-fill"></i> Execute Query';
+                executeBtn.innerHTML = '<i class="bi bi-play-fill me-2"></i> Execute Query';
             }
         });
 
@@ -607,27 +719,37 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
             sqlQuery.focus();
         });
 
-        // Add event listener for the checkbox
-        let revealLogged = false;
-        showReferenceQuery.addEventListener('change', async function () {
-            referenceQueryContainer.style.display = this.checked ? 'block' : 'none';
-            if (this.checked && !revealLogged) {
-                revealLogged = true;
-                try {
-                    await fetch(`/questions/${questionId}/log-reveal`, { method: 'POST' });
-                } catch (e) {
-                    console.error('Failed to log reveal:', e);
-                }
+        // Ctrl+Enter / Cmd+Enter to execute
+        sqlQuery.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                executeBtn.click();
             }
         });
 
-        // Add event listener for ChatGPT comparison
-        compareWithChatGPTBtn.addEventListener('click', async function () {
+        // Show/hide reference query toggle button (in AI panel footer)
+        let revealLogged = false;
+        const showRefBtn = document.getElementById('showReferenceQueryBtn');
+        const showRefLabel = document.getElementById('showReferenceQueryLabel');
+        if (showRefBtn) {
+            showRefBtn.addEventListener('click', async function () {
+                const isVisible = referenceQueryContainer.style.display !== 'none';
+                referenceQueryContainer.style.display = isVisible ? 'none' : 'block';
+                if (showRefLabel) showRefLabel.textContent = isVisible ? 'Show solution' : 'Hide solution';
+                if (!isVisible && !revealLogged) {
+                    revealLogged = true;
+                    try { await fetch(`/questions/${questionId}/log-reveal`, { method: 'POST' }); } catch(e) {}
+                }
+            });
+        }
+
+        // Add event listener for ChatGPT comparison (only when solution is unlocked)
+        if (compareWithChatGPTBtn) compareWithChatGPTBtn.addEventListener('click', async function () {
             const userQuery = sqlQuery.value.trim();
             const referenceQuery = referenceQueryElement.textContent;
 
             if (!userQuery || !referenceQuery) {
-                alert('Both queries are required for comparison');
+                window.sstToast('error', 'Both queries are required for comparison');
                 return;
             }
 
@@ -664,153 +786,47 @@ Territories (TerritoryID, TerritoryDescription, RegionID)
             }
         });
 
-        // Real-time query analysis with improved debouncing and change detection
-        let analysisTimeout;
-        let lastAnalysisTime = 0;
-        let lastAnalyzedQuery = '';
-        let lastQueryHash = '';
-        const realtimeFeedback = document.getElementById('realtime-feedback');
-        const realtimeLoading = document.getElementById('realtime-loading');
+        // On-demand AI feedback button
+        const aiFeedbackBtn = document.getElementById('aiFeedbackBtn');
+        const aiFeedbackPanel = document.getElementById('realtime-feedback');
+        const aiFeedbackLoading = document.getElementById('realtime-loading');
 
-        // Debug logging
-        console.log('Real-time analysis elements:', {
-            realtimeFeedback: realtimeFeedback,
-            realtimeLoading: realtimeLoading,
-            sqlQuery: sqlQuery
+        aiFeedbackBtn.addEventListener('click', async function () {
+            const query = sqlQuery.value.trim();
+            if (!query) {
+                aiFeedbackPanel.innerHTML = '<div class="text-muted"><i class="bi bi-robot"></i> Enter a query first.</div>';
+                return;
+            }
+            aiFeedbackBtn.disabled = true;
+            aiFeedbackBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Analyzing...';
+            aiFeedbackLoading.style.display = 'block';
+            aiFeedbackPanel.innerHTML = '';
+            try {
+                const response = await fetch(`/questions/${questionId}/analyze-syntax`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    aiFeedbackPanel.innerHTML = result.analysis;
+                } else {
+                    aiFeedbackPanel.innerHTML = `<div class="alert alert-warning">${result.message || 'Failed to analyze query'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error getting AI feedback:', error);
+                aiFeedbackPanel.innerHTML = '<div class="alert alert-danger">Failed to get feedback. Please try again.</div>';
+            } finally {
+                aiFeedbackLoading.style.display = 'none';
+                aiFeedbackBtn.disabled = false;
+                aiFeedbackBtn.innerHTML = '<i class="bi bi-robot me-1"></i> Get AI Feedback';
+            }
         });
 
+        // Character counter
         sqlQuery.addEventListener('input', function () {
-            if (!document.getElementById('aiFeedbackToggle')?.checked) return;
-            const query = this.value.trim();
-            const now = Date.now();
-            
-            // Clear previous timeout
-            if (analysisTimeout) {
-                clearTimeout(analysisTimeout);
-            }
-
-            // Only analyze if query has at least 3 words
-            const wordCount = query.split(/\s+/).filter(word => word.length > 0).length;
-            
-            if (wordCount < 3) {
-                realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-robot"></i> Type at least 3 words to get real-time feedback...</div>';
-                return;
-            }
-
-            // Also check if it looks like a SQL query
-            const sqlKeywords = ['SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP'];
-            const hasSqlKeywords = sqlKeywords.some(keyword => query.toUpperCase().includes(keyword));
-
-            if (!hasSqlKeywords) {
-                realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-robot"></i> Start typing a SQL query to get real-time feedback...</div>';
-                return;
-            }
-
-            // Time-based throttling: Don't analyze if less than 30 seconds have passed
-            const timeSinceLastAnalysis = now - lastAnalysisTime;
-            const minTimeBetweenAnalyses = 30000; // 30 seconds
-            
-            if (timeSinceLastAnalysis < minTimeBetweenAnalyses) {
-                const remainingTime = Math.ceil((minTimeBetweenAnalyses - timeSinceLastAnalysis) / 1000);
-                realtimeFeedback.innerHTML = `<div class='text-muted'><i class='bi bi-clock'></i> Please wait ${remainingTime} seconds before requesting another analysis...</div>`;
-                return;
-            }
-
-            // Change detection: Don't analyze if query is too similar to last analyzed query
-            if (lastAnalyzedQuery && lastAnalyzedQuery.trim()) {
-                const similarity = calculateQuerySimilarity(query, lastAnalyzedQuery);
-                if (similarity > 0.7) { // 70% similarity threshold
-                    realtimeFeedback.innerHTML = '<div class="text-muted"><i class="bi bi-info-circle"></i> Query hasn\'t changed significantly since last analysis...</div>';
-                    return;
-                }
-            }
-
-            // Show loading state
-            realtimeLoading.style.display = 'block';
-            realtimeFeedback.innerHTML = '';
-            analysisStatusBadge.textContent = 'Analyzing...';
-            analysisStatusBadge.className = 'badge bg-info';
-
-            // Set a timeout to debounce the API call (increased from 1s to 2s)
-            analysisTimeout = setTimeout(async () => {
-                try {
-                    const response = await fetch(`/questions/${questionId}/analyze-realtime`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 
-                            query,
-                            previousQuery: lastAnalyzedQuery,
-                            lastAnalysisTime: lastAnalysisTime
-                        })
-                    });
-
-                    const result = await response.json();
-                    console.log('Analysis response:', result);
-
-                    if (result.success) {
-                        if (result.skipped) {
-                            // Analysis was skipped due to change detection
-                            realtimeFeedback.innerHTML = result.analysis;
-                        } else {
-                            // New analysis received
-                            realtimeFeedback.innerHTML = result.analysis;
-                            lastAnalysisTime = result.analysisTime || now;
-                            lastAnalyzedQuery = query;
-                            lastQueryHash = result.queryHash || '';
-                        }
-                        analysisStatusBadge.textContent = 'Ready';
-                        analysisStatusBadge.className = 'badge bg-light text-dark';
-                    } else if (response.status === 429) {
-                        // Rate limited
-                        const retryAfter = result.retryAfter || 30;
-                        realtimeFeedback.innerHTML = `<div class="alert alert-warning"><i class="bi bi-clock"></i> Rate limited. Please wait ${retryAfter} seconds before requesting another analysis.</div>`;
-                        analysisStatusBadge.textContent = 'Rate Limited';
-                        analysisStatusBadge.className = 'badge bg-warning';
-                        countdownTimer.style.display = 'block';
-                        countdownSeconds.textContent = retryAfter;
-                        // Start countdown
-                        const countdownInterval = setInterval(() => {
-                            const currentSeconds = parseInt(countdownSeconds.textContent);
-                            if (currentSeconds > 0) {
-                                countdownSeconds.textContent = (currentSeconds - 1).toString();
-                            } else {
-                                clearInterval(countdownInterval);
-                                countdownTimer.style.display = 'none';
-                            }
-                        }, 1000);
-                    } else {
-                        realtimeFeedback.innerHTML = `<div class="alert alert-warning">${result.message || 'Failed to analyze query'}</div>`;
-                        analysisStatusBadge.textContent = 'Failed';
-                        analysisStatusBadge.className = 'badge bg-danger';
-                    }
-                } catch (error) {
-                    console.error('Error analyzing query:', error);
-                    realtimeFeedback.innerHTML = '<div class="alert alert-danger">Failed to analyze query. Please try again.</div>';
-                    analysisStatusBadge.textContent = 'Failed';
-                    analysisStatusBadge.className = 'badge bg-danger';
-                } finally {
-                    realtimeLoading.style.display = 'none';
-                }
-            }, 2000); // Increased to 2 seconds for better debouncing
+            const counter = document.getElementById('query-char-count');
+            if (counter) counter.textContent = this.value.length > 0 ? this.value.length + ' chars' : '';
         });
-
-        // Helper function to calculate query similarity (frontend version)
-        function calculateQuerySimilarity(query1, query2) {
-            // Normalize queries for comparison
-            const normalizeQuery = (q) => q.toLowerCase().replace(/\s+/g, ' ').trim();
-            const norm1 = normalizeQuery(query1);
-            const norm2 = normalizeQuery(query2);
-            
-            // Simple similarity calculation based on common words
-            const words1 = norm1.split(' ');
-            const words2 = norm2.split(' ');
-            
-            const commonWords = words1.filter(word => words2.includes(word));
-            const totalWords = Math.max(words1.length, words2.length);
-            
-            return totalWords === 0 ? 1 : commonWords.length / totalWords;
-        }
     });
 </script>

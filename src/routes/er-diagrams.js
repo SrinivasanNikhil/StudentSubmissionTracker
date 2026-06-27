@@ -9,16 +9,8 @@ const {
 	isAdmin,
 	isInstructorOrAdmin,
 } = require("../middleware/auth");
-const { OpenAI } = require("openai");
 const { Op } = require("sequelize");
-
-// Debug: Verify Topic is imported
-console.log("Topic model imported:", typeof Topic);
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-	apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = require("../services/openai");
 
 // Ensure upload directory exists
 const uploadDir = path.join(__dirname, "../public/uploads/diagrams");

@@ -36,7 +36,6 @@ router.get("/", isAuthenticated, async (req, res) => {
 			semester: user.semester || "",
 			courseSection: user.courseSection || "",
 			role: user.role || "student", // Explicitly include role
-			aiFeedbackEnabled: user.aiFeedbackEnabled !== false ? true : false,
 		};
 
 		res.render("pages/profile", {
@@ -105,16 +104,23 @@ router.post("/update", isAuthenticated, async (req, res) => {
 			associatedInstructorId: associatedInstructorId,
 		});
 
+		// Re-fetch so session reflects the persisted values, not the pre-update instance
+		const updatedUser = await User.findByPk(userId);
+
 		// Update session data
 		req.session.user = {
-			id: user.id,
-			email: user.email,
-			firstName: user.firstName || "",
-			lastName: user.lastName || "",
-			code: user.code || "",
-			role: user.role || "student",
-			instructorCode: user.instructorCode || null,
-			associatedInstructorId: user.associatedInstructorId || null,
+			id: updatedUser.id,
+			email: updatedUser.email,
+			firstName: updatedUser.firstName || "",
+			lastName: updatedUser.lastName || "",
+			code: updatedUser.code || "",
+			isAdmin: Boolean(updatedUser.isAdmin),
+			role: updatedUser.role || "student",
+			instructorCode: updatedUser.instructorCode || null,
+			associatedInstructorId: updatedUser.associatedInstructorId || null,
+			courseSection: updatedUser.courseSection || null,
+			academicYear: updatedUser.academicYear || null,
+			semester: updatedUser.semester || null,
 		};
 
 		// Set success message
@@ -235,11 +241,14 @@ router.post(
 
 			// If course section is provided, validate it exists for the instructor
 			if (courseSection && courseSection.trim()) {
+				const dashIndex = courseSection.indexOf("-");
+				const parsedCourseCode = dashIndex !== -1 ? courseSection.slice(0, dashIndex) : courseSection;
+				const parsedSectionCode = dashIndex !== -1 ? courseSection.slice(dashIndex + 1) : "";
 				const courseSectionExists = await InstructorCourseSection.findOne({
 					where: {
 						instructorId: user.associatedInstructorId,
-						courseCode: courseSection.split("-")[0] || courseSection,
-						sectionCode: courseSection.split("-")[1] || "",
+						courseCode: parsedCourseCode,
+						sectionCode: parsedSectionCode,
 						isActive: true,
 					},
 				});
@@ -272,9 +281,13 @@ router.post(
 				});
 			}
 
+			// Reload so the spread below reads committed DB values, not the pre-update instance
+			await user.reload();
+
 			// Update session data
 			req.session.user = {
 				...req.session.user,
+				associatedInstructorId: user.associatedInstructorId,
 				academicYear: user.academicYear,
 				semester: user.semester,
 				courseSection: user.courseSection,
@@ -290,23 +303,5 @@ router.post(
 		}
 	}
 );
-
-// Toggle AI feedback preference
-router.post("/toggle-ai-feedback", isAuthenticated, async (req, res) => {
-	try {
-		const user = await User.findByPk(req.session.userId);
-		if (!user) return res.status(404).json({ success: false });
-		await user.update({ aiFeedbackEnabled: !user.aiFeedbackEnabled });
-		return res.json({
-			success: true,
-			aiFeedbackEnabled: user.aiFeedbackEnabled,
-		});
-	} catch (error) {
-		console.error("Error toggling AI feedback:", error);
-		return res
-			.status(500)
-			.json({ success: false, message: error.message });
-	}
-});
 
 module.exports = router;

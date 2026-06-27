@@ -332,11 +332,11 @@
                     createModal.hide();
                     window.location.reload();
                 } else {
-                    alert(result.message || 'Failed to create instructor');
+                    window.sstToast('error', result.message || 'Failed to create instructor');
                 }
             } catch (error) {
                 console.error('Error creating instructor:', error);
-                alert('An error occurred while creating the instructor');
+                window.sstToast('error', 'An error occurred while creating the instructor');
             }
         });
 
@@ -371,11 +371,11 @@
                     deleteModal.hide();
                     window.location.reload();
                 } else {
-                    alert(result.message || 'Failed to delete instructor');
+                    window.sstToast('error', result.message || 'Failed to delete instructor');
                 }
             } catch (error) {
                 console.error('Error deleting instructor:', error);
-                alert('An error occurred while deleting the instructor');
+                window.sstToast('error', 'An error occurred while deleting the instructor');
             }
         });
 

@@ -1,54 +1,87 @@
 <div class="row justify-content-center">
-    <div class="col-md-8 text-center">
-        <div class="jumbotron my-5">
-            <h1 class="display-4">SQL Practice, Supercharged ⚡</h1>
-            <p class="lead">Write smarter queries. Build better models. Get instant feedback.</p>
-            <hr class="my-4">
-            <p>Tired of boring database exercises?<br><br>
-                Say hello to a new way to master SQL and ER modeling — fast, fun, and
-                feedback-first.
-            </p>
+    <div class="col-lg-10">
 
-            <% if (!locals.isAuthenticated) { %>
-                <div class="mt-4">
-                    <a href="/auth/register" class="btn btn-primary btn-lg me-2">Register</a>
-                    <a href="/auth/login" class="btn btn-outline-secondary btn-lg">Login</a>
-                </div>
-                <% } else { %>
-                    <div class="mt-4">
-                        <a href="/topics" class="btn btn-primary btn-lg">Start Practicing</a>
-                    </div>
+        <div class="hero-section my-5">
+            <div class="row align-items-center g-5">
+                <div class="col-md-6">
+                    <span class="hero-eyebrow">SQL + ER Modeling Practice</span>
+                    <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">
+                        Write smarter queries.<br>Build better models.
+                    </h1>
+                    <p class="mb-4" style="font-size: 1.05rem; max-width: 380px; line-height: 1.65;">
+                        Instant feedback. Progress tracking. Master SQL before your next exam or interview.
+                    </p>
+                    <% if (!locals.isAuthenticated) { %>
+                        <div class="d-flex gap-3">
+                            <a href="/auth/register" class="btn btn-primary px-4 py-2">Get started</a>
+                            <a href="/auth/login" class="btn btn-outline-secondary px-4 py-2">Sign in</a>
+                        </div>
+                    <% } else { %>
+                        <a href="/topics" class="btn btn-primary px-4 py-2">
+                            Start practicing <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
                     <% } %>
+                </div>
+                <div class="col-md-6">
+                    <div class="hero-code-preview">
+                        <span class="cm">-- top customers by revenue</span><br>
+                        <span class="kw">SELECT</span> <span class="id">c.customerName,</span><br>
+                        <span style="padding-left:1.5rem"><span class="fn">SUM</span><span class="id">(od.quantityOrdered * od.priceEach)</span></span><br>
+                        <span style="padding-left:1.5rem"><span class="kw">AS</span> <span class="ok">revenue</span></span><br>
+                        <span class="kw">FROM</span> <span class="id">Customers c</span><br>
+                        <span style="padding-left:1.5rem"><span class="kw">JOIN</span> <span class="id">Orders o USING (customerNumber)</span></span><br>
+                        <span class="kw">GROUP BY</span> <span class="id">c.customerName</span><br>
+                        <span class="kw">ORDER BY</span> <span class="ok">revenue</span> <span class="kw">DESC</span>
+                        <div class="success-banner">
+                            <i class="bi bi-check-circle-fill"></i>
+                            18 rows · matches solution
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="row mt-5">
+        <div class="row g-4 animate-grid">
             <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">🔍 Targeted Practice</h5>
-                        <p class="card-text">Explore hand-picked SQL questions and ER modeling tasks, from basic to
-                            brutal. Learn by doing, not just reading.</p>
+                <div class="card h-100 data-model-card">
+                    <div class="card-body p-4">
+                        <div class="topic-icon-wrap" style="background: var(--accent-tint); color: var(--accent-deep);">
+                            <i class="bi bi-bullseye"></i>
+                        </div>
+                        <h5 class="card-title">Targeted practice</h5>
+                        <p class="card-text">
+                            Hand-picked SQL questions and ER tasks, from basic joins to complex window functions. Learn by doing.
+                        </p>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">📈 Smart Feedback & Progress Tracking</h5>
-                        <p class="card-text">No more guessing — get real-time evaluation and see how you're improving
-                            over time.</p>
+                <div class="card h-100 sql-card">
+                    <div class="card-body p-4">
+                        <div class="topic-icon-wrap" style="background: var(--secondary-tint); color: var(--secondary-dark);">
+                            <i class="bi bi-graph-up"></i>
+                        </div>
+                        <h5 class="card-title">Smart feedback</h5>
+                        <p class="card-text">
+                            Real-time query evaluation. See exactly where your output diverges from the solution.
+                        </p>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">🎓 Built for University Success</h5>
-                        <p class="card-text">Crush your database course. Ace your assignments. Get ready for interviews
-                            — or build the next big thing.</p>
+                <div class="card h-100" style="border-left: 3px solid var(--info); border-radius: 0 var(--radius-lg) var(--radius-lg) 0;">
+                    <div class="card-body p-4">
+                        <div class="topic-icon-wrap" style="background: var(--info-tint); color: var(--info);">
+                            <i class="bi bi-mortarboard"></i>
+                        </div>
+                        <h5 class="card-title">Built for the course</h5>
+                        <p class="card-text">
+                            Structured around real course content. Ace your assignments and come out ready for interviews.
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
+
     </div>
 </div>

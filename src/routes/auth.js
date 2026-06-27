@@ -1,9 +1,36 @@
 const express = require("express");
 const router = express.Router();
-const bcrypt = require("bcrypt");
-const { User } = require("../models");
+const bcrypt = require("bcryptjs");
+const rateLimit = require("express-rate-limit");
+const { User, InstructorCourseSection } = require("../models");
 const { isAuthenticated, isNotAuthenticated } = require("../middleware/auth");
 const { validatePassword } = require("../utils/passwordValidator");
+const emailService = require("../utils/emailService");
+
+// Rate limiters for auth endpoints
+const loginLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000, // 15 minutes
+	max: 20,
+	message: "Too many login attempts, please try again in 15 minutes.",
+	standardHeaders: true,
+	legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+	windowMs: 60 * 60 * 1000, // 1 hour
+	max: 10,
+	message: "Too many registration attempts, please try again later.",
+	standardHeaders: true,
+	legacyHeaders: false,
+});
+
+const passwordResetLimiter = rateLimit({
+	windowMs: 60 * 60 * 1000, // 1 hour
+	max: 5,
+	message: "Too many password reset requests, please try again later.",
+	standardHeaders: true,
+	legacyHeaders: false,
+});
 
 // Display login form
 router.get("/login", isNotAuthenticated, (req, res) => {
@@ -11,21 +38,12 @@ router.get("/login", isNotAuthenticated, (req, res) => {
 });
 
 // Process login
-router.post("/login", isNotAuthenticated, async (req, res) => {
+router.post("/login", isNotAuthenticated, loginLimiter, async (req, res) => {
 	try {
 		const { email, password } = req.body;
 
 		// Find user by email
 		const user = await User.findOne({ where: { email } });
-
-		// Debug logging
-		console.log("Login attempt:", {
-			email,
-			userFound: !!user,
-			isAdmin: user?.isAdmin,
-			role: user?.role,
-			isAdminType: typeof user?.isAdmin,
-		});
 
 		// Check if user exists and password is correct
 		if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
@@ -48,18 +66,12 @@ router.post("/login", isNotAuthenticated, async (req, res) => {
 			role: user.role || (user.isAdmin ? "admin" : "student"), // New role system
 			instructorCode: user.instructorCode || null,
 			associatedInstructorId: user.associatedInstructorId || null,
+			courseSection: user.courseSection || null,
+			academicYear: user.academicYear || null,
+			semester: user.semester || null,
 		};
 
-		// Debug logging
-		console.log("Session data set:", {
-			userId: req.session.userId,
-			user: req.session.user,
-			isAdmin: req.session.user.isAdmin,
-			role: req.session.user.role,
-			isAdminType: typeof req.session.user.isAdmin,
-		});
-
-		// Save session explicitly
+		// Save session explicitly before redirecting
 		req.session.save((err) => {
 			if (err) {
 				console.error("Error saving session:", err);
@@ -69,15 +81,6 @@ router.post("/login", isNotAuthenticated, async (req, res) => {
 					email: req.body.email,
 				});
 			}
-
-			// Debug logging
-			console.log("Session saved successfully:", {
-				userId: req.session.userId,
-				user: req.session.user,
-				isAdmin: req.session.user.isAdmin,
-				role: req.session.user.role,
-				isAdminType: typeof req.session.user.isAdmin,
-			});
 
 			// Redirect based on role
 			if (user.role === "admin" || user.isAdmin) {
@@ -104,7 +107,7 @@ router.get("/register", isNotAuthenticated, (req, res) => {
 });
 
 // Process registration
-router.post("/register", isNotAuthenticated, async (req, res) => {
+router.post("/register", isNotAuthenticated, registerLimiter, async (req, res) => {
 	try {
 		const {
 			email,
@@ -203,12 +206,14 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 
 			// Validate course section if provided
 			if (courseSection && courseSection.trim()) {
-				const { InstructorCourseSection } = require("../models");
+				const dashIndex = courseSection.indexOf("-");
+				const parsedCourseCode = dashIndex !== -1 ? courseSection.slice(0, dashIndex) : courseSection;
+				const parsedSectionCode = dashIndex !== -1 ? courseSection.slice(dashIndex + 1) : "";
 				const courseSectionRecord = await InstructorCourseSection.findOne({
 					where: {
 						instructorId: instructor.id,
-						courseCode: courseSection.split("-")[0], // Extract course code
-						sectionCode: courseSection.split("-")[1] || courseSection, // Extract section code
+						courseCode: parsedCourseCode,
+						sectionCode: parsedSectionCode,
 						isActive: true,
 					},
 				});
@@ -219,14 +224,20 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 					academicYear = courseSectionRecord.academicYear;
 					semester = courseSectionRecord.semester;
 				} else {
-					// If course section not found, use current academic year/semester
-					academicYear = InstructorCourseSection.getCurrentAcademicYear();
-					semester = InstructorCourseSection.getCurrentSemester();
-					validatedCourseSection = courseSection.trim();
+					// Section string doesn't match any active section for this instructor.
+					// Reject with a clear message so the student can correct it.
+					return res.render("pages/register", {
+						title: "Register",
+						error: "That course section was not found for your instructor. Please check the section code, or leave it blank to register without one.",
+						email,
+						firstName,
+						lastName,
+						instructorCode,
+						courseSection,
+					});
 				}
 			} else {
 				// If no course section provided, use current academic year/semester
-				const { InstructorCourseSection } = require("../models");
 				academicYear = InstructorCourseSection.getCurrentAcademicYear();
 				semester = InstructorCourseSection.getCurrentSemester();
 			}
@@ -262,10 +273,26 @@ router.post("/register", isNotAuthenticated, async (req, res) => {
 			role: newUser.role || "student",
 			instructorCode: newUser.instructorCode || null,
 			associatedInstructorId: newUser.associatedInstructorId || null,
+			courseSection: newUser.courseSection || null,
+			academicYear: newUser.academicYear || null,
+			semester: newUser.semester || null,
 		};
 
-		// Redirect to topics page
-		res.redirect("/topics");
+		// Persist session before redirecting (same pattern as login)
+		req.session.save((err) => {
+			if (err) {
+				console.error("Error saving session after registration:", err);
+				return res.render("pages/register", {
+					title: "Register",
+					error: "An error occurred during registration. Please try again.",
+					email: req.body.email,
+					firstName: req.body.firstName,
+					lastName: req.body.lastName,
+					instructorCode: req.body.instructorCode,
+				});
+			}
+			res.redirect("/topics");
+		});
 	} catch (error) {
 		console.error("Registration error:", error);
 		res.render("pages/register", {
@@ -290,7 +317,7 @@ router.get("/forgot-password", isNotAuthenticated, (req, res) => {
 	});
 });
 
-router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
+router.post("/forgot-password", isNotAuthenticated, passwordResetLimiter, async (req, res) => {
 	try {
 		const { email } = req.body;
 
@@ -308,14 +335,15 @@ router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
 		const user = await User.findOne({ where: { email } });
 
 		if (user) {
-			// Check if user already has a valid reset token (not expired and not used)
-			const existingToken = await User.validateResetToken(user.resetToken);
+			// Check in-memory whether this user already has a valid, unexpired, unused token
+			const hasValidToken =
+				user.resetToken &&
+				user.resetTokenExpires &&
+				user.resetTokenExpires > new Date() &&
+				!user.resetTokenUsed;
 
-			if (existingToken) {
-				// User already has a valid reset token, don't send another email
-				console.log(
-					`Password reset already requested for ${email}, token still valid`
-				);
+			if (hasValidToken) {
+				// Don't issue a new token while a valid one exists
 				return res.render("pages/forgot-password", {
 					title: "Forgot Password",
 					error: null,
@@ -324,17 +352,10 @@ router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
 				});
 			}
 
-			// Generate reset token
+			// Generate and store a new reset token
 			const resetToken = await User.createPasswordReset(user);
-			console.log(
-				`Generated new reset token for ${email}: ${resetToken.substring(
-					0,
-					8
-				)}...`
-			);
 
 			// Send email
-			const emailService = require("../utils/emailService");
 			const emailSent = await emailService.sendPasswordResetEmail(
 				email,
 				resetToken,
@@ -342,7 +363,6 @@ router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
 			);
 
 			if (emailSent) {
-				console.log(`Password reset email sent successfully to ${email}`);
 				return res.render("pages/forgot-password", {
 					title: "Forgot Password",
 					error: null,
@@ -359,7 +379,6 @@ router.post("/forgot-password", isNotAuthenticated, async (req, res) => {
 			}
 		} else {
 			// Don't reveal if user exists or not (security best practice)
-			console.log(`Password reset requested for non-existent email: ${email}`);
 			return res.render("pages/forgot-password", {
 				title: "Forgot Password",
 				error: null,
@@ -450,10 +469,12 @@ router.post("/reset-password/:token", isNotAuthenticated, async (req, res) => {
 			});
 		}
 
-		// Update password and invalidate token
+		// Update password and fully clear the reset token so it cannot be replayed
 		const passwordHash = await bcrypt.hash(password, 10);
 		await user.update({
 			passwordHash,
+			resetToken: null,
+			resetTokenExpires: null,
 			resetTokenUsed: true,
 		});
 

@@ -1,45 +1,69 @@
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Login</h4>
-            </div>
-            <div class="card-body">
-                <% if (locals.error) { %>
-                    <div class="alert alert-danger" role="alert">
-                        <%= error %>
+<div class="auth-layout my-4">
+    <div class="row g-4 justify-content-center align-items-stretch w-100">
+        <div class="col-md-5 d-none d-md-flex">
+            <div class="auth-brand-panel w-100">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:2.5rem;">
+                    <div style="width:36px; height:36px; background:rgba(251,244,231,0.12); border-radius:8px; border:1px solid rgba(251,244,231,0.2); display:flex; align-items:center; justify-content:center; font-family:'Fraunces',Georgia,serif; font-weight:500; font-size:16px; color:var(--paper);">N</div>
+                    <span style="font-family:'Fraunces',Georgia,serif; font-size:1.1rem; font-weight:500; color:var(--paper);">SQL Practice</span>
+                </div>
+                <h2>Master SQL and ER modeling — at your own pace.</h2>
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="bi bi-lightning-charge"></i></div>
+                    <div>
+                        <p style="color:var(--paper); font-weight:500; margin-bottom:2px; font-size:0.9rem;">Instant feedback</p>
+                        <p style="color:rgba(251,244,231,0.55); font-size:0.82rem; margin:0;">Know immediately whether your query matches the expected output.</p>
                     </div>
-                    <% } %>
-
-                        <% if (locals.success) { %>
-                            <div class="alert alert-success" role="alert">
-                                <%= success %>
-                            </div>
-                            <% } %>
-
-                                <form action="/auth/login" method="POST">
-                                    <div class="mb-3">
-                                        <label for="email" class="form-label">University Email</label>
-                                        <input type="email" class="form-control" id="email" name="email"
-                                            placeholder="your.name@university.edu" value="<%= locals.email || '' %>"
-                                            required>
-                                        <div class="form-text">Please use your university email address.</div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="password" class="form-label">Password</label>
-                                        <input type="password" class="form-control" id="password" name="password"
-                                            required>
-                                    </div>
-                                    <div class="d-grid gap-2">
-                                        <button type="submit" class="btn btn-primary">Login</button>
-                                    </div>
-                                </form>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="bi bi-graph-up"></i></div>
+                    <div>
+                        <p style="color:var(--paper); font-weight:500; margin-bottom:2px; font-size:0.9rem;">Progress tracking</p>
+                        <p style="color:rgba(251,244,231,0.55); font-size:0.82rem; margin:0;">See completion across every topic in your course section.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="bi bi-robot"></i></div>
+                    <div>
+                        <p style="color:var(--paper); font-weight:500; margin-bottom:2px; font-size:0.9rem;">AI syntax hints</p>
+                        <p style="color:rgba(251,244,231,0.55); font-size:0.82rem; margin:0;">Get guidance on your query without giving away the answer.</p>
+                    </div>
+                </div>
             </div>
-            <div class="card-footer text-center">
-                <p class="mb-0">
-                    Don't have an account? <a href="/auth/register">Register</a> |
-                    <a href="/auth/forgot-password">Forgot Password?</a>
-                </p>
+        </div>
+        <div class="col-md-5 d-flex align-items-center">
+            <div class="auth-card w-100">
+                <div class="card-header" style="background: var(--ink) !important; padding: 1.5rem;">
+                    <h4 style="color:var(--paper); font-family:'Fraunces',Georgia,serif; font-weight:500; margin-bottom:4px;">Welcome back</h4>
+                    <p style="color:rgba(251,244,231,0.6); font-size:0.875rem; margin:0;">Sign in to continue practicing</p>
+                </div>
+                <div class="card-body p-4">
+                    <% if (locals.error) { %>
+                        <div class="alert alert-danger" role="alert"><%= error %></div>
+                    <% } %>
+                    <% if (locals.success) { %>
+                        <div class="alert alert-success" role="alert"><%= success %></div>
+                    <% } %>
+                    <form action="/auth/login" method="POST">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">University email</label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                placeholder="your.name@university.edu"
+                                value="<%= locals.email || '' %>" required>
+                        </div>
+                        <div class="mb-4">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary py-2">Sign in</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center py-3">
+                    <span class="caption">No account? <a href="/auth/register">Register</a></span>
+                    <span class="caption" style="margin: 0 8px;">·</span>
+                    <a href="/auth/forgot-password" class="caption" style="color:var(--muted);">Forgot password?</a>
+                </div>
             </div>
         </div>
     </div>

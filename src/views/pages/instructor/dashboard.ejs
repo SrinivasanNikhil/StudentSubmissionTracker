@@ -2,37 +2,38 @@
     <h1 class="mb-4">Instructor Dashboard</h1>
 
     <!-- Statistics Cards -->
-    <div class="row mb-4">
+    <div class="row mb-4 g-3">
         <div class="col-md-4">
             <div class="card text-center h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Total Students</h5>
-                    <h2 class="display-4">
-                        <%= stats.totalStudents %>
-                    </h2>
-                    <p class="text-muted">Students in your class</p>
+                <div class="card-body py-4">
+                    <p class="text-muted small mb-1">Total Students</p>
+                    <h2 class="display-5 fw-semibold mb-0"><%= stats.totalStudents %></h2>
+                    <p class="text-muted small mt-1">
+                        <span style="color:#4f46e5; font-weight:500;"><%= engagementRate %>%</span>
+                        have completed at least one question
+                    </p>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card text-center h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Total Completions</h5>
-                    <h2 class="display-4">
-                        <%= stats.totalCompletions %>
-                    </h2>
-                    <p class="text-muted">Questions completed by students</p>
+                <div class="card-body py-4">
+                    <p class="text-muted small mb-1">Completion Rate</p>
+                    <h2 class="display-5 fw-semibold mb-0"><%= completionRate %>%</h2>
+                    <p class="text-muted small mt-1">
+                        <%= stats.totalCompletions %> of <%= stats.totalStudents * totalQuestions %> possible
+                    </p>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card text-center h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Active Students</h5>
-                    <h2 class="display-4">
-                        <%= stats.uniqueStudentsWithCompletions %>
+                <div class="card-body py-4">
+                    <p class="text-muted small mb-1">Avg per Student</p>
+                    <h2 class="display-5 fw-semibold mb-0">
+                        <%= stats.totalStudents > 0 ? Math.round(stats.totalCompletions / stats.totalStudents) : 0 %>
                     </h2>
-                    <p class="text-muted">Students with completed work</p>
+                    <p class="text-muted small mt-1">questions completed on average</p>
                 </div>
             </div>
         </div>
@@ -63,28 +64,11 @@
                             </div>
                             <i class="bi bi-chevron-right"></i>
                         </a>
-                        <a href="/instructor/export/students"
+                        <a href="/instructor/export"
                             class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
-                                <i class="bi bi-download me-2"></i> Export Student Matrix
-                                <p class="text-muted mb-0 small">Download detailed completion matrix for all students
-                                </p>
-                            </div>
-                            <i class="bi bi-chevron-right"></i>
-                        </a>
-                        <a href="/instructor/export/summary"
-                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="bi bi-download me-2"></i> Export Student Summary
-                                <p class="text-muted mb-0 small">Download summary of student completion counts</p>
-                            </div>
-                            <i class="bi bi-chevron-right"></i>
-                        </a>
-                        <a href="/instructor/export/by-topic/form"
-                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="bi bi-list-columns me-2"></i> Export by Topic
-                                <p class="text-muted mb-0 small">Download completion counts per topic (completed/total)</p>
+                                <i class="bi bi-download me-2"></i> Export Center
+                                <p class="text-muted mb-0 small">Download completion matrices, topic summaries, and detailed attempt reports</p>
                             </div>
                             <i class="bi bi-chevron-right"></i>
                         </a>
@@ -92,7 +76,7 @@
                             class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
                                 <i class="bi bi-calendar3 me-2"></i> Course Sections
-                                <p class="text-muted mb-0 small">Manage semester-based course sections and export data
+                                <p class="text-muted mb-0 small">Manage semester-based course sections
                                 </p>
                             </div>
                             <i class="bi bi-chevron-right"></i>
@@ -160,6 +144,7 @@
                         <tr>
                             <th>Name</th>
                             <th>Email</th>
+                            <th>Completed</th>
                             <th>Joined</th>
                             <th>Actions</th>
                         </tr>
@@ -167,7 +152,7 @@
                     <tbody>
                         <% if (students.length===0) { %>
                             <tr>
-                                <td colspan="4" class="text-center py-4">No students assigned yet</td>
+                                <td colspan="5" class="text-center py-4">No students assigned yet</td>
                             </tr>
                             <% } else { %>
                                 <% students.slice(0, 10).forEach(student=> { %>
@@ -179,16 +164,22 @@
                                                         <span class="text-muted">Not provided</span>
                                                         <% } %>
                                         </td>
-                                        <td>
+                                        <td class="text-muted small">
                                             <%= student.email %>
                                         </td>
                                         <td>
+                                            <span class="fw-medium" style="color:<%= student.completionCount === 0 ? '#dc2626' : '#059669' %>">
+                                                <%= student.completionCount %>
+                                            </span>
+                                            <span class="text-muted small"> / <%= totalQuestions %></span>
+                                        </td>
+                                        <td class="text-muted small">
                                             <%= new Date(student.createdAt).toLocaleDateString() %>
                                         </td>
                                         <td>
                                             <a href="/instructor/students/<%= student.id %>"
                                                 class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i> View Progress
+                                                <i class="bi bi-eye"></i> View
                                             </a>
                                         </td>
                                     </tr>

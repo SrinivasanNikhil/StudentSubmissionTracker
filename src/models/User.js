@@ -8,16 +8,16 @@ module.exports = (sequelize) => {
 			return bcrypt.compare(password, this.passwordHash);
 		}
 
-		// Role helper methods
-		isAdmin() {
-			return this.role === "admin" || this.isAdmin === true;
+		// Role helper methods (prefixed with "role" to avoid colliding with the isAdmin DB column)
+		isAdminRole() {
+			return this.role === "admin";
 		}
 
-		isInstructor() {
+		isInstructorRole() {
 			return this.role === "instructor";
 		}
 
-		isStudent() {
+		isStudentRole() {
 			return this.role === "student";
 		}
 

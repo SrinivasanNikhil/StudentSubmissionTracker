@@ -6,9 +6,10 @@ const {
 	Question,
 	Topic,
 	InstructorCourseSection,
+	InstructorSectionTopicSetting,
 } = require("../models");
 const { isAuthenticated, isInstructor } = require("../middleware/auth");
-const { Op } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
 const createCsvStringifier = require("csv-writer").createObjectCsvStringifier;
 
 // Course section management dashboard
@@ -45,10 +46,7 @@ router.get(
 				},
 				attributes: [
 					"courseSection",
-					[
-						require("sequelize").fn("COUNT", require("sequelize").col("id")),
-						"studentCount",
-					],
+					[fn("COUNT", col("id")), "studentCount"],
 				],
 				group: ["courseSection"],
 			});
@@ -239,14 +237,11 @@ router.get(
 
 			// Get completion statistics for these students
 			const studentIds = students.map((student) => student.id);
-			const completions = await Completion.findAll({
-				where: {
-					userId: {
-						[Op.in]: studentIds,
-					},
-				},
-				attributes: ["userId", "questionId"],
-			});
+			const completions = studentIds.length
+				? await Completion.findAll({
+					where: { userId: { [Op.in]: studentIds } },
+				  })
+				: [];
 
 			// Create a map of student completions
 			const studentCompletions = new Map();
@@ -256,17 +251,17 @@ router.get(
 				}
 				studentCompletions.get(completion.userId).add(completion.questionId);
 			});
-
-			// Add completion counts to students
-			students.forEach((student) => {
-				student.dataValues.completionCount =
-					studentCompletions.get(student.id)?.size || 0;
+			// Add completion counts and convert to plain objects so EJS can access completionCount directly
+			const studentsWithCounts = students.map((student) => {
+				const plain = student.toJSON();
+				plain.completionCount = studentCompletions.get(student.id)?.size || 0;
+				return plain;
 			});
 
 			res.render("pages/instructor/course-section-students", {
 				title: `${courseSection.getDisplayName()} - Students`,
 				courseSection,
-				students,
+				students: studentsWithCounts,
 			});
 		} catch (error) {
 			console.error("Course section students error:", error);
@@ -278,152 +273,99 @@ router.get(
 	}
 );
 
-// Export semester-based data
+// View and manage topic settings for a course section
 router.get(
-	"/export/semester",
+	"/course-sections/:id/topics",
 	isAuthenticated,
 	isInstructor,
 	async (req, res) => {
 		try {
 			const instructorId = req.session.user.id;
-			const { academicYear, semester, courseSection, topicId } = req.query;
+			const { id } = req.params;
 
-			// Build filter conditions
-			const userWhereCondition = {
-				associatedInstructorId: instructorId,
-				role: "student",
-			};
-
-			if (academicYear && academicYear !== "all") {
-				userWhereCondition.academicYear = academicYear;
-			}
-			if (semester && semester !== "all") {
-				userWhereCondition.semester = semester;
-			}
-			if (courseSection && courseSection !== "all") {
-				userWhereCondition.courseSection = courseSection;
-			}
-
-			// Get students matching filters
-			const students = await User.findAll({
-				where: userWhereCondition,
-				attributes: [
-					"id",
-					"email",
-					"firstName",
-					"lastName",
-					"academicYear",
-					"semester",
-					"courseSection",
-				],
-				order: [["createdAt", "DESC"]],
+			const courseSection = await InstructorCourseSection.findOne({
+				where: { id, instructorId },
 			});
 
-			if (students.length === 0) {
+			if (!courseSection) {
 				return res.status(404).render("pages/error", {
-					title: "No Students",
-					message: "No students found for the selected filters.",
+					title: "Course Section Not Found",
+					message: "The requested course section was not found.",
 				});
 			}
 
-			// Get student IDs for completion filter
-			const studentIds = students.map((student) => student.id);
+			const topics = await Topic.findAll({ order: [["id", "ASC"]] });
 
-			// Get all questions with their topics
-			const questionInclude = [{ model: Topic, as: "topic" }];
-			if (topicId && topicId !== "all") {
-				questionInclude[0].where = { id: topicId };
-			}
-
-			const questions = await Question.findAll({
-				include: questionInclude,
-				order: [
-					[{ model: Topic, as: "topic" }, "name", "ASC"],
-					["questionNumber", "ASC"],
-				],
+			const existingSettings = await InstructorSectionTopicSetting.findAll({
+				where: { instructorCourseSectionId: id },
 			});
 
-			// Get all completions for these students
-			const completions = await Completion.findAll({
-				where: {
-					userId: {
-						[Op.in]: studentIds,
-					},
-				},
-				attributes: ["userId", "questionId"],
-			});
-
-			// Create a map of student completions for quick lookup
-			const studentCompletions = new Map();
-			completions.forEach((completion) => {
-				if (!studentCompletions.has(completion.userId)) {
-					studentCompletions.set(completion.userId, new Set());
-				}
-				studentCompletions.get(completion.userId).add(completion.questionId);
-			});
-
-			// Generate CSV headers
-			const headers = [
-				{ id: "email", title: "Email" },
-				{ id: "name", title: "Name" },
-				{ id: "academicYear", title: "Academic Year" },
-				{ id: "semester", title: "Semester" },
-				{ id: "courseSection", title: "Course Section" },
-			];
-
-			// Add question columns
-			questions.forEach((question) => {
-				headers.push({
-					id: `q${question.id}`,
-					title: `${question.topic.name} - Q${question.questionNumber}`,
-				});
-			});
-
-			// Generate CSV data
-			const csvStringifier = createCsvStringifier({ header: headers });
-
-			const csvData = students.map((student) => {
-				const row = {
-					email: student.email,
-					name:
-						`${student.firstName || ""} ${student.lastName || ""}`.trim() ||
-						"Not provided",
-					academicYear: student.academicYear || "Not specified",
-					semester: student.semester || "Not specified",
-					courseSection: student.courseSection || "Not specified",
-				};
-
-				// Add completion status for each question
-				questions.forEach((question) => {
-					const hasCompleted =
-						studentCompletions.get(student.id)?.has(question.id) || false;
-					row[`q${question.id}`] = hasCompleted ? "Completed" : "Not Completed";
-				});
-
-				return row;
-			});
-
-			// Set response headers for CSV download
-			const filename = `completions_${academicYear || "all"}_${
-				semester || "all"
-			}_${courseSection || "all"}_${
-				new Date().toISOString().split("T")[0]
-			}.csv`;
-			res.setHeader("Content-Type", "text/csv");
-			res.setHeader(
-				"Content-Disposition",
-				`attachment; filename="${filename}"`
+			const settingsMap = new Map(
+				existingSettings.map((s) => [s.topicId, s])
 			);
 
-			// Send CSV data
-			res.write(csvStringifier.getHeaderString());
-			res.write(csvStringifier.stringifyRecords(csvData));
-			res.end();
+			const topicsWithSettings = topics.map((t) => {
+				const setting = settingsMap.get(t.id);
+				return {
+					...t.toJSON(),
+					isVisible: setting ? setting.isVisible : true,
+					dueDate: setting ? setting.dueDate : null,
+					gracePeriodMinutes: setting ? setting.gracePeriodMinutes : 0,
+				};
+			});
+
+			res.render("pages/instructor/section-topics", {
+				title: `${courseSection.getDisplayName()} - Topic Settings`,
+				courseSection,
+				topicsWithSettings,
+			});
 		} catch (error) {
-			console.error("Export semester data error:", error);
+			console.error("Section topics error:", error);
 			res.status(500).render("pages/error", {
 				title: "Error",
-				message: "An error occurred while exporting data.",
+				message: "An error occurred while loading topic settings.",
+			});
+		}
+	}
+);
+
+// Save topic settings for a course section (handles one topic at a time via individual row forms)
+router.post(
+	"/course-sections/:id/topics/settings",
+	isAuthenticated,
+	isInstructor,
+	async (req, res) => {
+		try {
+			const instructorId = req.session.user.id;
+			const { id } = req.params;
+
+			const courseSection = await InstructorCourseSection.findOne({
+				where: { id, instructorId },
+			});
+
+			if (!courseSection) {
+				return res.status(404).json({
+					success: false,
+					message: "Course section not found",
+				});
+			}
+
+			const { topicId, isVisible, dueDate, gracePeriodMinutes } = req.body;
+
+			await InstructorSectionTopicSetting.upsert({
+				instructorCourseSectionId: parseInt(id),
+				topicId: parseInt(topicId),
+				isVisible: Boolean(isVisible),
+				dueDate: dueDate || null,
+				gracePeriodMinutes: parseInt(gracePeriodMinutes, 10) || 0,
+			});
+
+			return res.json({ success: true });
+		} catch (error) {
+			console.error("Save topic settings error:", error);
+			return res.status(500).json({
+				success: false,
+				message: "Failed to save topic settings",
 			});
 		}
 	}

@@ -1,0 +1,379 @@
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Choose Export Type</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3" id="exportTypeCards">
+            <div class="col-md-6 col-lg-4">
+                <div class="card card-interactive h-100 export-type-card" data-type="topic-summary">
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="type" value="topic-summary"
+                                id="type-topic-summary" <%= initialType === 'topic-summary' ? 'checked' : '' %>>
+                            <label class="form-check-label fw-bold" for="type-topic-summary">
+                                <i class="bi bi-list-columns me-1"></i> Topic Completion Summary
+                            </label>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">Completed/total question counts per topic, one row per student.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="card card-interactive h-100 export-type-card" data-type="detailed-attempts">
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="type" value="detailed-attempts"
+                                id="type-detailed-attempts" <%= initialType === 'detailed-attempts' ? 'checked' : '' %>>
+                            <label class="form-check-label fw-bold" for="type-detailed-attempts">
+                                <i class="bi bi-list-columns me-1"></i> Detailed Question Attempts
+                            </label>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">One row per student/question: attempt count, best match %, scores.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="card card-interactive h-100 export-type-card" data-type="matrix">
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="type" value="matrix"
+                                id="type-matrix" <%= initialType === 'matrix' ? 'checked' : '' %>>
+                            <label class="form-check-label fw-bold" for="type-matrix">
+                                <i class="bi bi-people me-1"></i> Student Completion Matrix
+                            </label>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">One row per student, one column per question (1/0).</p>
+                    </div>
+                </div>
+            </div>
+            <% if (!isAdmin) { %>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card card-interactive h-100 export-type-card" data-type="submissions">
+                        <div class="card-body">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="type" value="submissions"
+                                    id="type-submissions" <%= initialType === 'submissions' ? 'checked' : '' %>>
+                                <label class="form-check-label fw-bold" for="type-submissions">
+                                    <i class="bi bi-diagram-3 me-1"></i> ER Diagram Submissions
+                                </label>
+                            </div>
+                            <p class="text-muted small mt-2 mb-0">All ER diagram submissions from your students.</p>
+                        </div>
+                    </div>
+                </div>
+            <% } %>
+            <% if (isAdmin) { %>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card card-interactive h-100 export-type-card" data-type="instructors">
+                        <div class="card-body">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="type" value="instructors"
+                                    id="type-instructors" <%= initialType === 'instructors' ? 'checked' : '' %>>
+                                <label class="form-check-label fw-bold" for="type-instructors">
+                                    <i class="bi bi-person-workspace me-1"></i> Instructor Directory
+                                </label>
+                            </div>
+                            <p class="text-muted small mt-2 mb-0">All instructors with their student counts.</p>
+                        </div>
+                    </div>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<form action="<%= isAdmin ? '/admin/export/run' : '/instructor/export/run' %>" method="GET" id="exportForm">
+    <input type="hidden" name="type" id="selectedType" value="<%= initialType %>">
+
+    <div class="card mb-4 export-filter-bar">
+        <div class="card-header">
+            <h5 class="mb-0">Filters</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label" for="academicYear">Academic Year</label>
+                    <select class="form-select" id="academicYear" name="academicYear">
+                        <option value="all" <%= initialFilters.academicYear === 'all' ? 'selected' : '' %>>All Academic Years</option>
+                        <% academicYears.forEach(year => { %>
+                            <option value="<%= year %>" <%= initialFilters.academicYear === year ? 'selected' : '' %>><%= year %></option>
+                        <% }); %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="semester">Semester</label>
+                    <select class="form-select" id="semester" name="semester">
+                        <option value="all" <%= initialFilters.semester === 'all' ? 'selected' : '' %>>All Semesters</option>
+                        <% semesters.forEach(sem => { %>
+                            <option value="<%= sem %>" <%= initialFilters.semester === sem ? 'selected' : '' %>><%= sem %></option>
+                        <% }); %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="courseSection">Course Section</label>
+                    <select class="form-select" id="courseSection" name="courseSection">
+                        <option value="all" <%= initialFilters.courseSection === 'all' ? 'selected' : '' %>>All Course Sections</option>
+                        <% courseSections.forEach(section => { %>
+                            <option value="<%= section.identifier %>" <%= initialFilters.courseSection === section.identifier ? 'selected' : '' %>><%= section.displayName %></option>
+                        <% }); %>
+                    </select>
+                </div>
+                <% if (isAdmin) { %>
+                    <div class="col-md-3 admin-only-filter" data-for-type="matrix">
+                        <label class="form-label" for="domain">Email Domain</label>
+                        <select class="form-select" id="domain" name="domain">
+                            <option value="all" <%= initialFilters.domain === 'all' ? 'selected' : '' %>>All Domains</option>
+                            <% domains.forEach(domain => { %>
+                                <option value="<%= domain %>" <%= initialFilters.domain === domain ? 'selected' : '' %>><%= domain %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                    <div class="col-md-3 admin-only-filter" data-for-type="matrix">
+                        <label class="form-label" for="code">Code</label>
+                        <select class="form-select" id="code" name="code">
+                            <option value="all">All Codes</option>
+                            <% codes.forEach(code => { %>
+                                <option value="<%= code %>"><%= code %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                <% } %>
+            </div>
+            <small class="text-muted">Filters apply to student-scoped exports only; leave as "All" to include everyone.</small>
+        </div>
+    </div>
+
+    <div class="card mb-4 export-type-panel" data-type="topic-summary">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Topics</h5>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-secondary me-2 select-all-topics">Select All</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary deselect-all-topics">Deselect All</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <% if (topics.length === 0) { %>
+                <div class="alert alert-warning">No topics available for export.</div>
+            <% } else { %>
+                <div class="row">
+                    <% topics.forEach(topic => { %>
+                        <div class="col-md-6 col-lg-4 mb-2">
+                            <div class="form-check topic-check-row">
+                                <input class="form-check-input topic-checkbox" type="checkbox"
+                                    name="topicSummaryTopicIds" value="<%= topic.id %>" id="topic-summary-<%= topic.id %>" checked>
+                                <label class="form-check-label" for="topic-summary-<%= topic.id %>">
+                                    <%= topic.name %>
+                                    <span class="badge bg-secondary ms-1"><%= topic.questionCount %> questions</span>
+                                </label>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="card mb-4 export-type-panel d-none" data-type="detailed-attempts">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Topics <span class="text-muted small">(required, select at least 1)</span></h5>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-secondary me-2 select-all-topics-detail">Select All</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary deselect-all-topics-detail">Deselect All</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <% if (topics.length === 0) { %>
+                <div class="alert alert-warning">No topics available for export.</div>
+            <% } else { %>
+                <div class="row">
+                    <% topics.forEach(topic => { %>
+                        <div class="col-md-6 col-lg-4 mb-2">
+                            <div class="form-check topic-check-row">
+                                <input class="form-check-input topic-checkbox-detail" type="checkbox"
+                                    name="detailedAttemptsTopicIds" value="<%= topic.id %>" id="topic-detail-<%= topic.id %>" checked>
+                                <label class="form-check-label" for="topic-detail-<%= topic.id %>">
+                                    <%= topic.name %>
+                                    <span class="badge bg-secondary ms-1"><%= topic.questionCount %> questions</span>
+                                </label>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="card mb-4 export-type-panel d-none" data-type="matrix">
+        <div class="card-header">
+            <h5 class="mb-0">Matrix Options</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label" for="topicId">Limit to a single topic (optional)</label>
+                    <select class="form-select" id="topicId" name="topicId">
+                        <option value="all">All Topics</option>
+                        <% topics.forEach(topic => { %>
+                            <option value="<%= topic.id %>"><%= topic.name %></option>
+                        <% }); %>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="summaryOnly" value="true" id="summaryOnly">
+                        <label class="form-check-label" for="summaryOnly">
+                            Summary only (totals, no per-question columns)
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4 export-type-panel d-none" data-type="submissions">
+        <div class="card-body">
+            <p class="text-muted mb-0">This export includes every ER diagram submission from your students — no additional filters apply.</p>
+        </div>
+    </div>
+
+    <div class="card mb-4 export-type-panel d-none" data-type="instructors">
+        <div class="card-body">
+            <p class="text-muted mb-0">This export includes every instructor account with their associated student counts — no filters apply.</p>
+        </div>
+    </div>
+
+    <div class="alert alert-info export-preview-alert">
+        <i class="bi bi-info-circle me-2"></i>
+        <span id="exportPreviewText">Select an export type above to see what the CSV will contain.</span>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+        <% if (isAdmin) { %>
+            <a href="/admin" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        <% } else { %>
+            <a href="/instructor/dashboard" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        <% } %>
+        <button type="submit" class="btn btn-primary" id="exportBtn">
+            <i class="bi bi-download me-1"></i> Export CSV
+        </button>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const isAdminPage = <%= isAdmin ? 'true' : 'false' %>;
+    const form = document.getElementById('exportForm');
+    const selectedTypeInput = document.getElementById('selectedType');
+    const exportBtn = document.getElementById('exportBtn');
+    const previewText = document.getElementById('exportPreviewText');
+    const radios = document.querySelectorAll('input[name="type"]');
+    const panels = document.querySelectorAll('.export-type-panel');
+    const filterBar = document.querySelector('.export-filter-bar');
+    const adminOnlyFilters = document.querySelectorAll('.admin-only-filter');
+
+    const previews = {
+        'topic-summary': 'The CSV will include Email, Name, Code, and two numeric columns per selected topic (Completed, Total), plus Total Completed / Total Questions columns.',
+        'detailed-attempts': 'The CSV will include one row per student per question in the selected topics, with attempt count, best match %, completion status, and AI/admin scores.',
+        'matrix': 'The CSV will include one row per student with a 1/0 column for each question (or just totals if "Summary only" is checked).',
+        'submissions': 'The CSV will include every ER diagram submission from your students: student, question, status, scores, and submission date.',
+        'instructors': 'The CSV will include every instructor account with their email, name, instructor code, and student count.',
+    };
+
+    function currentType() {
+        const checked = document.querySelector('input[name="type"]:checked');
+        return checked ? checked.value : 'topic-summary';
+    }
+
+    function updatePanels() {
+        const type = currentType();
+        selectedTypeInput.value = type;
+        panels.forEach((panel) => {
+            panel.classList.toggle('d-none', panel.dataset.type !== type);
+        });
+        filterBar.classList.toggle('d-none', type === 'instructors');
+        if (isAdminPage) {
+            adminOnlyFilters.forEach((el) => {
+                el.classList.toggle('d-none', el.dataset.forType !== type);
+            });
+        }
+        previewText.textContent = previews[type] || '';
+        updateExportButton();
+    }
+
+    function updateExportButton() {
+        const type = currentType();
+        if (type === 'topic-summary') {
+            const checkedCount = document.querySelectorAll('.topic-checkbox:checked').length;
+            exportBtn.disabled = checkedCount === 0;
+        } else if (type === 'detailed-attempts') {
+            const checkedCount = document.querySelectorAll('.topic-checkbox-detail:checked').length;
+            exportBtn.disabled = checkedCount === 0;
+        } else {
+            exportBtn.disabled = false;
+        }
+    }
+
+    radios.forEach((radio) => radio.addEventListener('change', updatePanels));
+    document.querySelectorAll('.export-type-card').forEach((card) => {
+        card.addEventListener('click', function (e) {
+            if (e.target.tagName === 'INPUT') return;
+            const radio = card.querySelector('input[name="type"]');
+            radio.checked = true;
+            updatePanels();
+        });
+    });
+
+    document.querySelectorAll('.topic-checkbox').forEach((cb) => cb.addEventListener('change', updateExportButton));
+    document.querySelectorAll('.topic-checkbox-detail').forEach((cb) => cb.addEventListener('change', updateExportButton));
+
+    document.querySelector('.select-all-topics')?.addEventListener('click', function () {
+        document.querySelectorAll('.topic-checkbox').forEach((cb) => (cb.checked = true));
+        updateExportButton();
+    });
+    document.querySelector('.deselect-all-topics')?.addEventListener('click', function () {
+        document.querySelectorAll('.topic-checkbox').forEach((cb) => (cb.checked = false));
+        updateExportButton();
+    });
+    document.querySelector('.select-all-topics-detail')?.addEventListener('click', function () {
+        document.querySelectorAll('.topic-checkbox-detail').forEach((cb) => (cb.checked = true));
+        updateExportButton();
+    });
+    document.querySelector('.deselect-all-topics-detail')?.addEventListener('click', function () {
+        document.querySelectorAll('.topic-checkbox-detail').forEach((cb) => (cb.checked = false));
+        updateExportButton();
+    });
+
+    form.addEventListener('submit', function (e) {
+        const type = currentType();
+        if (type === 'topic-summary' && document.querySelectorAll('.topic-checkbox:checked').length === 0) {
+            e.preventDefault();
+            window.sstToast('error', 'Please select at least one topic to export.');
+        } else if (type === 'detailed-attempts' && document.querySelectorAll('.topic-checkbox-detail:checked').length === 0) {
+            e.preventDefault();
+            window.sstToast('error', 'Please select at least one topic to export.');
+        }
+    });
+
+    updatePanels();
+});
+</script>
+
+<style>
+    .topic-check-row {
+        padding: 0.5rem 0.5rem 0.5rem 2rem;
+        border-radius: var(--radius-md);
+        transition: background-color 0.2s;
+    }
+
+    .topic-check-row:hover {
+        background-color: var(--surface-raised);
+    }
+
+    .export-type-card .form-check-input {
+        margin-top: 0.2rem;
+    }
+</style>

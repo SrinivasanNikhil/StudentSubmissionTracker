@@ -4,6 +4,8 @@ const path = require("path");
 const dotenv = require("dotenv");
 const expressLayouts = require("express-ejs-layouts");
 const flash = require("connect-flash");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const {
 	testConnection,
 	initializeDatabase,
@@ -18,6 +20,13 @@ dotenv.config();
 
 // Create Express app
 const app = express();
+
+// Security headers
+app.use(
+	helmet({
+		contentSecurityPolicy: false, // disabled to keep EJS CDN links (Bootstrap etc.) working without per-route nonces
+	})
+);
 
 // Setup view engine (EJS)
 app.set("views", path.join(__dirname, "views"));
@@ -76,47 +85,19 @@ app.use(flash());
 // Pass user info to all templates
 app.use((req, res, next) => {
 	try {
-		// Debug logging
-		console.log("Template middleware - Session state:", {
-			hasSession: !!req.session,
-			hasUserId: !!req.session?.userId,
-			hasUser: !!req.session?.user,
-			userData: req.session?.user,
-			isAdmin: req.session?.user?.isAdmin,
-			role: req.session?.user?.role,
-			isAdminType: typeof req.session?.user?.isAdmin,
-			sessionID: req.sessionID,
-			cookie: req.session?.cookie,
-		});
-
-		// Pass session info to templates
-		res.locals.sessionID = req.sessionID;
-		res.locals.sessionCookie = req.session?.cookie;
-
 		if (req.session?.user) {
-			// Ensure we're working with a fresh copy of the user data
-			const userData = {
+			res.locals.user = {
 				...req.session.user,
-				isAdmin: Boolean(req.session.user.isAdmin), // Backward compatibility
+				isAdmin: Boolean(req.session.user.isAdmin),
 				role:
 					req.session.user.role ||
-					(req.session.user.isAdmin ? "admin" : "student"), // New role system
+					(req.session.user.isAdmin ? "admin" : "student"),
 			};
-
-			res.locals.user = userData;
-
-			// Debug logging
-			console.log("Template middleware - Locals set:", {
-				user: res.locals.user,
-				isAdmin: res.locals.user.isAdmin,
-				role: res.locals.user.role,
-				isAdminType: typeof res.locals.user.isAdmin,
-				sessionID: req.sessionID,
-			});
 		} else {
 			res.locals.user = null;
 		}
 		res.locals.isAuthenticated = Boolean(req.session?.userId);
+		res.locals.currentPath = req.path;
 		res.locals.error = req.flash("error")[0];
 		res.locals.success = req.flash("success")[0];
 		next();

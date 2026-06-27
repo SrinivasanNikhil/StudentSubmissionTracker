@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -b /tmp/instructor_cookies.txt \"http://localhost:3000/instructor/course-management/export/semester\")",
+      "Bash(curl -s -b /tmp/admin_cookies.txt \"http://localhost:3000/admin\" -o /tmp/admin_dash.html -w \"%{http_code}\\\\n\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s -b /tmp/admin_cookies.txt \"http://localhost:3000/admin/users\" -o /tmp/admin_users.html -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s -b /tmp/instructor_cookies.txt \"http://localhost:3000/instructor/students\" -o /tmp/instr_students.html -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s -b /tmp/instructor_cookies.txt \"http://localhost:3000/instructor/submissions\" -o /tmp/instr_subs.html -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s -b /tmp/instructor_cookies.txt \"http://localhost:3000/instructor/course-management/course-sections\" -o /tmp/instr_cs.html -w \"%{http_code}\\\\n\")"
     ]
   }
 }

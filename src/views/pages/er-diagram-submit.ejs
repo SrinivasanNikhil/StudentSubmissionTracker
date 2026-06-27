@@ -125,7 +125,7 @@
             }
         } catch (error) {
             console.error('Error:', error);
-            alert(error.message || 'Error submitting ER diagram. Please try again.');
+            window.sstToast('error', error.message || 'Error submitting ER diagram. Please try again.');
         } finally {
             loadingModal.hide();
             submitButton.disabled = false;

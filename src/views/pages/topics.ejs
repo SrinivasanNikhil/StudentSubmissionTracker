@@ -1,52 +1,77 @@
-<div class="container mt-4">
-    <div class="mx-auto" style="max-width: 1200px; margin-left: 2rem; margin-right: 2rem;">
-        <div class="text-center mb-5">
-            <h1 class="display-4 mb-3">SQL Topics</h1>
-            <p class="lead text-muted">Select a topic to view practice questions</p>
-        </div>
+<div class="mx-auto" style="max-width: 1200px;">
+    <div class="text-center mb-5">
+        <h1 class="display-4 mb-3">SQL topics</h1>
+        <p class="lead text-muted">Select a topic to view practice questions</p>
+    </div>
 
-        <div class="row g-4">
-            <% if (topics && topics.length> 0) { %>
-                <% topics.forEach(topic=> { %>
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card h-100 shadow-sm hover-shadow">
-                            <div class="card-body d-flex flex-column">
-                                <h5 class="card-title mb-3">
-                                    <i class="bi bi-database me-2"></i>
-                                    <%= topic.name %>
-                                </h5>
-                                <p class="card-text text-muted flex-grow-1">
-                                    Practice questions related to <%= topic.name.toLowerCase() %> in SQL.
-                                </p>
-                                <div class="mt-auto">
-                                    <a href="/questions/topic/<%= topic.id %>" class="btn btn-primary w-100">
-                                        View Questions
-                                        <i class="bi bi-arrow-right ms-2"></i>
-                                    </a>
-                                </div>
+    <div class="row g-4 animate-grid">
+        <% if (topics && topics.length > 0) { %>
+            <% topics.forEach(topic => {
+                const pct = (topic.totalCount > 0) ? Math.round(((topic.completedCount || 0) / topic.totalCount) * 100) : 0;
+                const ringStroke = +(2 * Math.PI * 19).toFixed(2);
+                const ringOffset = topic.totalCount > 0 ? +(ringStroke * (1 - pct / 100)).toFixed(1) : ringStroke;
+                const ringColor  = pct === 100 ? '#5A6B47' : '#8A3F22';
+            %>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 card-interactive"
+                         style="position: relative;">
+                        <% if (topic.totalCount > 0) { %>
+                        <div style="position: absolute; top: 14px; right: 14px; z-index: 1;">
+                            <svg width="48" height="48" viewBox="0 0 48 48"
+                                 aria-label="<%= topic.completedCount || 0 %> of <%= topic.totalCount %> completed">
+                                <circle cx="24" cy="24" r="19" fill="none" stroke="#EDE2CE" stroke-width="4"/>
+                                <circle cx="24" cy="24" r="19" fill="none"
+                                        stroke="<%= ringColor %>" stroke-width="4"
+                                        stroke-dasharray="<%= ringStroke %>"
+                                        stroke-dashoffset="<%= ringOffset %>"
+                                        stroke-linecap="round"
+                                        transform="rotate(-90 24 24)"
+                                        style="transition: stroke-dashoffset 0.5s ease;"/>
+                                <text x="24" y="28" text-anchor="middle" font-size="11" font-weight="600"
+                                      fill="<%= ringColor %>" font-family="'IBM Plex Sans', system-ui, sans-serif">
+                                    <% if (pct === 100) { %>✓<% } else { %><%= topic.completedCount || 0 %>/<%= topic.totalCount %><% } %>
+                                </text>
+                            </svg>
+                        </div>
+                        <% } %>
+                        <div class="card-body d-flex flex-column" style="padding-right: 4.5rem;">
+                            <h5 class="card-title mb-3">
+                                <i class="bi bi-database me-2"></i>
+                                <%= topic.name %>
+                            </h5>
+                            <p class="card-text text-muted flex-grow-1">
+                                Practice questions related to <%= topic.name.toLowerCase() %> in SQL.
+                            </p>
+                            <% if (topic.dueDate) { %>
+                            <div class="mt-2">
+                                <span class="badge <%= topic.isPastDue ? 'bg-danger' : 'bg-warning text-dark' %>">
+                                    <i class="bi bi-calendar me-1"></i>
+                                    Due: <%= new Date(topic.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                                    <% if (topic.isPastDue) { %>(Closed)<% } %>
+                                </span>
+                            </div>
+                            <% } %>
+                            <div class="mt-auto pt-3">
+                                <a href="/questions/topic/<%= topic.id %>"
+                                   class="btn w-100 <%= pct === 100 ? 'btn-success' : 'btn-primary' %>">
+                                    <% if (pct === 100) { %>
+                                        <i class="bi bi-check-circle me-2"></i>Review
+                                    <% } else { %>
+                                        View questions <i class="bi bi-arrow-right ms-2"></i>
+                                    <% } %>
+                                </a>
                             </div>
                         </div>
                     </div>
-                    <% }); %>
-                        <% } else { %>
-                            <div class="col-12">
-                                <div class="alert alert-info">
-                                    <i class="bi bi-info-circle me-2"></i>
-                                    No topics available at the moment. Please check back later.
-                                </div>
-                            </div>
-                            <% } %>
-        </div>
+                </div>
+            <% }); %>
+        <% } else { %>
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    No topics available at the moment. Please check back later.
+                </div>
+            </div>
+        <% } %>
     </div>
 </div>
-
-<style>
-    .hover-shadow {
-        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    }
-
-    .hover-shadow:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-    }
-</style>

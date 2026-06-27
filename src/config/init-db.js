@@ -4,7 +4,7 @@ const User = require("../models/User");
 const Topic = require("../models/Topic");
 const Question = require("../models/Question");
 const Completion = require("../models/Completion");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const createDatabase = require("./create-db");
 
 // Sample data for initial database setup

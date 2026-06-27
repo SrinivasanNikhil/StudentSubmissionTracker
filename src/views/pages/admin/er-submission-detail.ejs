@@ -207,7 +207,7 @@
             }
         } catch (error) {
             console.error('Error:', error);
-            alert(error.message || 'Error saving review. Please try again.');
+            window.sstToast('error', error.message || 'Error saving review. Please try again.');
         } finally {
             submitButton.disabled = false;
             submitButton.innerHTML = '<i class="bi bi-save me-2"></i>Save Review';
@@ -262,7 +262,7 @@
             }
         } catch (error) {
             console.error('Error:', error);
-            alert(error.message || 'Error triggering AI evaluation. Please try again.');
+            window.sstToast('error', error.message || 'Error triggering AI evaluation. Please try again.');
         } finally {
             button.disabled = false;
             button.innerHTML = originalText;
@@ -309,7 +309,7 @@
 
         } catch (error) {
             console.error('Error:', error);
-            alert('Error copying AI evaluation. Please try again.');
+            window.sstToast('error', 'Error copying AI evaluation. Please try again.');
         } finally {
             button.disabled = false;
             button.innerHTML = originalText;

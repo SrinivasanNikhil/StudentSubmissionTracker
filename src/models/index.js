@@ -7,6 +7,7 @@ const Question = require("./Question")(sequelize);
 const Completion = require("./Completion")(sequelize);
 const InstructorCourseSection = require("./InstructorCourseSection")(sequelize);
 const InteractionLog = require("./InteractionLog")(sequelize);
+const InstructorSectionTopicSetting = require("./InstructorSectionTopicSetting")(sequelize);
 
 // Define associations between models
 Topic.hasMany(Question, { foreignKey: "topicId", as: "questions" });
@@ -42,6 +43,24 @@ User.belongsTo(User, {
 InteractionLog.belongsTo(User, { foreignKey: "userId" });
 InteractionLog.belongsTo(Question, { foreignKey: "questionId" });
 
+// InstructorSectionTopicSetting associations
+InstructorCourseSection.hasMany(InstructorSectionTopicSetting, {
+	foreignKey: "instructorCourseSectionId",
+	as: "topicSettings",
+});
+InstructorSectionTopicSetting.belongsTo(InstructorCourseSection, {
+	foreignKey: "instructorCourseSectionId",
+	as: "section",
+});
+Topic.hasMany(InstructorSectionTopicSetting, {
+	foreignKey: "topicId",
+	as: "sectionSettings",
+});
+InstructorSectionTopicSetting.belongsTo(Topic, {
+	foreignKey: "topicId",
+	as: "topic",
+});
+
 // Re-export the models
 module.exports = {
 	User,
@@ -50,4 +69,5 @@ module.exports = {
 	Completion,
 	InstructorCourseSection,
 	InteractionLog,
+	InstructorSectionTopicSetting,
 };
