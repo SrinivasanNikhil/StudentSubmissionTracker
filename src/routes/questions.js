@@ -266,7 +266,7 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 		if (result.success && question.solution) {
 			comparison = await compareQueries(query, question.solution, databaseName);
 
-			// Check if the student query matches BOTH rows AND columns
+			// Check if the student query matches rows, columns, AND column names
 			// Also ensure the comparison object has all required properties for safety
 			if (
 				comparison &&
@@ -274,7 +274,8 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 				comparison.studentResult &&
 				comparison.solutionResult &&
 				comparison.rowsMatch && // Rows must match
-				comparison.columnsMatch // Column count must match
+				comparison.columnsMatch && // Column count must match
+				comparison.columnNamesMatch // Column names must match (fuzzy)
 			) {
 				isCompleted = true;
 
@@ -305,7 +306,7 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 						});
 
 						console.log(
-							`✅ Question ${id} marked as completed for user ${userId} - All criteria met (rows, columns)`
+							`✅ Question ${id} marked as completed for user ${userId} - All criteria met (rows, columns, column names)`
 						);
 					} else {
 						console.log(`ℹ️ Question ${id} already completed for user ${userId}`);
@@ -318,6 +319,7 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 				const reasons = [];
 				if (!comparison.rowsMatch) reasons.push("row count mismatch");
 				if (!comparison.columnsMatch) reasons.push("column count mismatch");
+				if (!comparison.columnNamesMatch) reasons.push("column name mismatch");
 
 				console.log(
 					`❌ Question ${id} NOT completed for user ${userId} - Reasons: ${reasons.join(

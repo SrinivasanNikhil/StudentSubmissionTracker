@@ -16,6 +16,7 @@ logs/
 .vscode/
 .cursor/
 .idea/
+.playwright-mcp/
 *.swp
 *.swo
 

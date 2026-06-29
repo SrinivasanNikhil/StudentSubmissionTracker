@@ -727,6 +727,22 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
             }
         });
 
+        // Block pasting into the SQL editor (deter copy-pasted solutions)
+        sqlQuery.addEventListener('paste', function (e) {
+            e.preventDefault();
+            window.sstToast('warning', 'Pasting is disabled in the SQL editor — please type your query.', 4000);
+        });
+        sqlQuery.addEventListener('drop', function (e) {
+            e.preventDefault();
+            window.sstToast('warning', 'Dragging text into the SQL editor is disabled — please type your query.', 4000);
+        });
+        sqlQuery.addEventListener('dragover', function (e) {
+            e.preventDefault();
+        });
+        sqlQuery.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+        });
+
         // Show/hide reference query toggle button (in AI panel footer)
         let revealLogged = false;
         const showRefBtn = document.getElementById('showReferenceQueryBtn');
