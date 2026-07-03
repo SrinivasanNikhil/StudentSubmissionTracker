@@ -81,6 +81,19 @@
                             </div>
                             <i class="bi bi-chevron-right"></i>
                         </a>
+                        <a href="/instructor/credit-requests"
+                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-coin me-2"></i> AI Credit Requests
+                                <p class="text-muted mb-0 small">Review student requests for additional AI feedback credits</p>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <% if (pendingCreditRequestCount > 0) { %>
+                                <span class="badge bg-warning text-dark"><%= pendingCreditRequestCount %> pending</span>
+                                <% } %>
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                        </a>
                     </div>
                 </div>
             </div>

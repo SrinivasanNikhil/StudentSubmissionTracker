@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Question, Topic, Completion, User, InteractionLog, InstructorCourseSection, InstructorSectionTopicSetting } = require("../models");
+const { Question, Topic, Completion, User, InteractionLog, InstructorCourseSection, InstructorSectionTopicSetting, InstructorSectionCreditSetting, StudentCreditBalance, CreditTransaction, CreditRequest } = require("../models");
 const { isAuthenticated } = require("../middleware/auth");
 const { executeQuery, compareQueries, isSelectOnly } = require("../services/sqlExecutor");
 const openai = require("../services/openai");
@@ -50,6 +50,148 @@ async function getSolutionUnlockStatus(userId, questionId) {
 
 	const solutionUnlocked = attemptCount >= 5 && bestRatio >= 0.75;
 	return { solutionUnlocked, attemptCount, bestRatio, existingCompletion: null };
+}
+
+// gpt-4.1-nano pricing (as of 2026-06): $0.10 / 1M input tokens, $0.40 / 1M output tokens
+const GPT41_NANO_INPUT_PRICE_PER_TOKEN = 0.10 / 1_000_000;
+const GPT41_NANO_OUTPUT_PRICE_PER_TOKEN = 0.40 / 1_000_000;
+
+function estimateCostUsd(promptTokens, completionTokens) {
+	return (
+		(promptTokens || 0) * GPT41_NANO_INPUT_PRICE_PER_TOKEN +
+		(completionTokens || 0) * GPT41_NANO_OUTPUT_PRICE_PER_TOKEN
+	);
+}
+
+// Returns the InstructorSectionCreditSetting for a section, or null if none exists
+async function getCreditSetting(section) {
+	if (!section) return null;
+	return InstructorSectionCreditSetting.findOne({
+		where: { instructorCourseSectionId: section.id },
+	});
+}
+
+// Returns the cost-per-request for a section (defaults to 1 if no setting row)
+async function getCreditCost(section) {
+	const setting = await getCreditSetting(section);
+	return setting ? setting.costPerRequest : 1;
+}
+
+// Finds or lazily creates the StudentCreditBalance for this student/section/term.
+// Seeds with defaultCredits from the section setting (or 10 if no setting exists).
+async function getOrCreateCreditBalance(user, section) {
+	const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+	const semester = InstructorCourseSection.getCurrentSemester();
+
+	const existing = await StudentCreditBalance.findOne({
+		where: {
+			userId: user.id,
+			instructorCourseSectionId: section.id,
+			academicYear,
+			semester,
+		},
+	});
+	if (existing) return existing;
+
+	const setting = await getCreditSetting(section);
+	const seedAmount = setting ? setting.defaultCredits : 10;
+
+	const balance = await StudentCreditBalance.create({
+		userId: user.id,
+		instructorCourseSectionId: section.id,
+		academicYear,
+		semester,
+		creditsRemaining: seedAmount,
+		creditsGrantedTotal: seedAmount,
+	});
+
+	await CreditTransaction.create({
+		userId: user.id,
+		questionId: null,
+		instructorCourseSectionId: section.id,
+		type: "seed",
+		amount: seedAmount,
+		balanceAfter: seedAmount,
+		academicYear,
+		semester,
+		occurredAt: new Date(),
+	});
+
+	return balance;
+}
+
+// Atomically decrements the balance. Returns the new creditsRemaining value,
+// or null if the balance was already insufficient (race-lost).
+async function spendCredit(user, section, balanceId, questionId, cost, usage) {
+	const { sequelize: appSequelize } = require("../config/database");
+	const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+	const semester = InstructorCourseSection.getCurrentSemester();
+
+	const [affectedRows] = await appSequelize.query(
+		`UPDATE student_credit_balances
+		 SET credits_remaining = credits_remaining - :cost,
+		     updated_at = NOW()
+		 WHERE id = :id AND credits_remaining >= :cost`,
+		{
+			replacements: { cost, id: balanceId },
+			type: appSequelize.constructor.QueryTypes.UPDATE,
+		}
+	);
+
+	if (!affectedRows) return null;
+
+	const updated = await StudentCreditBalance.findByPk(balanceId);
+	const newBalance = updated ? updated.creditsRemaining : null;
+
+	const promptTokens = usage ? usage.prompt_tokens : null;
+	const completionTokens = usage ? usage.completion_tokens : null;
+	const totalTokens = usage ? usage.total_tokens : null;
+	const estCost = usage ? estimateCostUsd(promptTokens, completionTokens) : null;
+
+	await CreditTransaction.create({
+		userId: user.id,
+		questionId: questionId || null,
+		instructorCourseSectionId: section.id,
+		type: "spend",
+		amount: -cost,
+		balanceAfter: newBalance,
+		promptTokens,
+		completionTokens,
+		totalTokens,
+		estimatedCostUsd: estCost,
+		academicYear,
+		semester,
+		occurredAt: new Date(),
+	});
+
+	return newBalance;
+}
+
+// Writes a zero-amount CreditTransaction for unlimited sections (preserves research data)
+async function logUnlimitedSpend(user, section, questionId, usage) {
+	const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+	const semester = InstructorCourseSection.getCurrentSemester();
+
+	const promptTokens = usage ? usage.prompt_tokens : null;
+	const completionTokens = usage ? usage.completion_tokens : null;
+	const totalTokens = usage ? usage.total_tokens : null;
+	const estCost = usage ? estimateCostUsd(promptTokens, completionTokens) : null;
+
+	await CreditTransaction.create({
+		userId: user.id,
+		questionId: questionId || null,
+		instructorCourseSectionId: section.id,
+		type: "spend",
+		amount: 0,
+		balanceAfter: null,
+		promptTokens,
+		completionTokens,
+		totalTokens,
+		estimatedCostUsd: estCost,
+		academicYear,
+		semester,
+		occurredAt: new Date(),
+	});
 }
 
 // Get questions by topic ID
@@ -190,6 +332,40 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 		const prevId = idx > 0 ? topicQuestions[idx - 1].id : null;
 		const nextId = idx < topicQuestions.length - 1 ? topicQuestions[idx + 1].id : null;
 
+		// Credit info for the AI feedback button display
+		const sessionUser = req.session.user;
+		const creditSection = await getStudentSection(sessionUser);
+		let creditsRemaining = null;
+		let creditCost = null;
+		let creditUnlimited = false;
+		let hasPendingCreditRequest = false;
+		if (creditSection) {
+			const creditSetting = await getCreditSetting(creditSection);
+			creditUnlimited = creditSetting ? creditSetting.unlimited : false;
+			creditCost = creditSetting ? creditSetting.costPerRequest : 1;
+			if (!creditUnlimited) {
+				const bal = await StudentCreditBalance.findOne({
+					where: {
+						userId: req.session.userId,
+						instructorCourseSectionId: creditSection.id,
+						academicYear: InstructorCourseSection.getCurrentAcademicYear(),
+						semester: InstructorCourseSection.getCurrentSemester(),
+					},
+				});
+				creditsRemaining = bal ? bal.creditsRemaining : null;
+				const pendingReq = await CreditRequest.findOne({
+					where: {
+						userId: req.session.userId,
+						instructorCourseSectionId: creditSection.id,
+						status: "pending",
+						academicYear: InstructorCourseSection.getCurrentAcademicYear(),
+						semester: InstructorCourseSection.getCurrentSemester(),
+					},
+				});
+				hasPendingCreditRequest = !!pendingReq;
+			}
+		}
+
 		res.render("pages/question-detail", {
 			title: `Question #${question.id}`,
 			question,
@@ -202,6 +378,11 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 			nextId,
 			questionIndex: idx + 1,
 			totalQuestions: topicQuestions.length,
+			creditsRemaining,
+			creditCost,
+			creditUnlimited,
+			hasPendingCreditRequest,
+			hasCreditSection: !!creditSection,
 		});
 	} catch (error) {
 		console.error("Error fetching question:", error);
@@ -486,6 +667,33 @@ router.post("/:id/analyze-syntax", isAuthenticated, async (req, res) => {
 			});
 		}
 
+		// Credit gate — only applies to students in a course section
+		const sessionUser = req.session.user;
+		const section = await getStudentSection(sessionUser);
+		let creditBalance = null;
+		let cost = 0;
+		let isUnlimited = false;
+
+		if (section) {
+			const creditSetting = await getCreditSetting(section);
+			isUnlimited = creditSetting ? creditSetting.unlimited : false;
+
+			if (!isUnlimited) {
+				cost = creditSetting ? creditSetting.costPerRequest : 1;
+				creditBalance = await getOrCreateCreditBalance(sessionUser, section);
+
+				if (creditBalance.creditsRemaining < cost) {
+					return res.status(403).json({
+						success: false,
+						code: "NO_CREDITS",
+						message: "You have used all your AI feedback credits. Request more from your instructor.",
+						creditsRemaining: creditBalance.creditsRemaining,
+						costPerRequest: cost,
+					});
+				}
+			}
+		}
+
 		const question = await Question.findByPk(id, {
 			include: [{ model: Topic, as: "topic" }],
 		});
@@ -524,6 +732,7 @@ Format the response in HTML with appropriate styling.`;
 		});
 
 		const analysis = completion.choices[0].message.content;
+		const usage = completion.usage;
 
 		const user = await User.findByPk(userId);
 		await logInteraction(userId, id, "ai_feedback_requested", {
@@ -531,10 +740,41 @@ Format the response in HTML with appropriate styling.`;
 			analysisLength: analysis.length,
 		}, user);
 
-		return res.json({
-			success: true,
-			analysis: analysis,
-		});
+		// Record credit spend / usage after successful OpenAI response
+		let newCreditsRemaining = null;
+		if (section) {
+			if (isUnlimited) {
+				await logUnlimitedSpend(sessionUser, section, id, usage).catch((e) =>
+					console.error("Error logging unlimited spend transaction:", e)
+				);
+			} else {
+				newCreditsRemaining = await spendCredit(
+					sessionUser,
+					section,
+					creditBalance.id,
+					id,
+					cost,
+					usage
+				);
+				if (newCreditsRemaining === null) {
+					// Race-lost: balance was drained concurrently; return analysis anyway
+					console.warn(`Credit race condition for userId=${userId} questionId=${id} — returning analysis without charging`);
+					newCreditsRemaining = 0;
+				}
+			}
+		}
+
+		const responsePayload = { success: true, analysis };
+		if (section) {
+			if (isUnlimited) {
+				responsePayload.unlimited = true;
+			} else {
+				responsePayload.creditsRemaining = newCreditsRemaining;
+				responsePayload.costPerRequest = cost;
+			}
+		}
+
+		return res.json(responsePayload);
 	} catch (error) {
 		console.error("Error analyzing query:", error);
 		return res.status(500).json({
@@ -542,6 +782,58 @@ Format the response in HTML with appropriate styling.`;
 			message: "Error analyzing query",
 			error: error.message,
 		});
+	}
+});
+
+// Student requests additional AI credits from instructor
+router.post("/credits/request", isAuthenticated, async (req, res) => {
+	try {
+		const sessionUser = req.session.user;
+		const { message } = req.body;
+
+		const section = await getStudentSection(sessionUser);
+		if (!section) {
+			return res.status(400).json({
+				success: false,
+				message: "You must be enrolled in a course section to request credits.",
+			});
+		}
+
+		const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+		const semester = InstructorCourseSection.getCurrentSemester();
+
+		// Only one pending request per student per section/term at a time
+		const existing = await CreditRequest.findOne({
+			where: {
+				userId: sessionUser.id,
+				instructorCourseSectionId: section.id,
+				status: "pending",
+				academicYear,
+				semester,
+			},
+		});
+
+		if (existing) {
+			return res.status(400).json({
+				success: false,
+				message: "You already have a pending credit request. Please wait for your instructor to respond.",
+			});
+		}
+
+		await CreditRequest.create({
+			userId: sessionUser.id,
+			instructorCourseSectionId: section.id,
+			status: "pending",
+			studentMessage: message ? String(message).slice(0, 1000) : null,
+			requestedAt: new Date(),
+			academicYear,
+			semester,
+		});
+
+		return res.json({ success: true, message: "Credit request submitted. Your instructor will be notified." });
+	} catch (error) {
+		console.error("Error submitting credit request:", error);
+		return res.status(500).json({ success: false, message: "Failed to submit credit request." });
 	}
 });
 

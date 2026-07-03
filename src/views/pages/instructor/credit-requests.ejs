@@ -1,0 +1,197 @@
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/instructor/dashboard">Instructor Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">AI Credit Requests</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                AI Credit Requests
+                <% if (pendingCount > 0) { %>
+                <span class="badge bg-warning text-dark ms-2"><%= pendingCount %> pending</span>
+                <% } %>
+            </h1>
+            <p class="text-muted mb-0">Review and respond to students requesting additional AI feedback credits.</p>
+        </div>
+    </div>
+
+    <!-- Status filter tabs -->
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link <%= statusFilter === 'pending' ? 'active' : '' %>" href="/instructor/credit-requests?status=pending">
+                Pending
+                <% if (pendingCount > 0) { %><span class="badge bg-warning text-dark ms-1"><%= pendingCount %></span><% } %>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <%= statusFilter === 'approved' ? 'active' : '' %>" href="/instructor/credit-requests?status=approved">Approved</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <%= statusFilter === 'denied' ? 'active' : '' %>" href="/instructor/credit-requests?status=denied">Denied</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <%= statusFilter === 'all' ? 'active' : '' %>" href="/instructor/credit-requests?status=all">All</a>
+        </li>
+    </ul>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <% if (requests.length === 0) { %>
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                    No <%= statusFilter === 'all' ? '' : statusFilter %> credit requests.
+                </div>
+            <% } else { %>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student</th>
+                            <th>Section</th>
+                            <th>Requested</th>
+                            <th>Message</th>
+                            <th>Status</th>
+                            <% if (statusFilter === 'pending' || statusFilter === 'all') { %>
+                            <th style="width: 320px;">Action</th>
+                            <% } else { %>
+                            <th>Resolution</th>
+                            <% } %>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% requests.forEach(function(req) { %>
+                        <tr id="req-row-<%= req.id %>">
+                            <td>
+                                <strong><%= req.student.firstName || '' %> <%= req.student.lastName || '' %></strong>
+                                <% if (!req.student.firstName && !req.student.lastName) { %><span class="text-muted">Not provided</span><% } %>
+                                <br><small class="text-muted"><%= req.student.email %></small>
+                            </td>
+                            <td>
+                                <small><%= req.section.courseCode %>-<%= req.section.sectionCode %></small><br>
+                                <small class="text-muted"><%= req.section.courseName %></small>
+                            </td>
+                            <td class="text-nowrap">
+                                <small><%= new Date(req.requestedAt).toLocaleDateString() %></small><br>
+                                <small class="text-muted"><%= new Date(req.requestedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) %></small>
+                            </td>
+                            <td>
+                                <% if (req.studentMessage) { %>
+                                    <span class="text-muted small"><%= req.studentMessage.slice(0, 120) %><%= req.studentMessage.length > 120 ? '…' : '' %></span>
+                                <% } else { %>
+                                    <span class="text-muted small fst-italic">No message</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <% if (req.status === 'pending') { %>
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                <% } else if (req.status === 'approved') { %>
+                                    <span class="badge bg-success">Approved</span>
+                                <% } else { %>
+                                    <span class="badge bg-secondary">Denied</span>
+                                <% } %>
+                            </td>
+                            <% if (req.status === 'pending') { %>
+                            <td>
+                                <div class="d-flex gap-2 align-items-start flex-wrap" id="action-<%= req.id %>">
+                                    <input type="number" min="1" class="form-control form-control-sm"
+                                           id="grant-amount-<%= req.id %>"
+                                           placeholder="Credits to grant"
+                                           style="width: 130px;">
+                                    <input type="text" class="form-control form-control-sm"
+                                           id="instructor-note-<%= req.id %>"
+                                           placeholder="Note (optional)"
+                                           style="width: 150px;">
+                                    <button class="btn btn-sm btn-success approve-btn" data-req-id="<%= req.id %>">
+                                        <i class="bi bi-check-lg"></i> Approve
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary deny-btn" data-req-id="<%= req.id %>">
+                                        <i class="bi bi-x-lg"></i> Deny
+                                    </button>
+                                </div>
+                            </td>
+                            <% } else { %>
+                            <td>
+                                <% if (req.creditsGranted) { %>
+                                    <span class="text-success small">+<%= req.creditsGranted %> credits granted</span><br>
+                                <% } %>
+                                <% if (req.instructorNote) { %>
+                                    <span class="text-muted small"><%= req.instructorNote %></span>
+                                <% } %>
+                                <% if (req.resolvedAt) { %>
+                                    <br><small class="text-muted"><%= new Date(req.resolvedAt).toLocaleDateString() %></small>
+                                <% } %>
+                            </td>
+                            <% } %>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    async function resolveRequest(reqId, action) {
+        const creditsGranted = document.getElementById('grant-amount-' + reqId)?.value;
+        const instructorNote = document.getElementById('instructor-note-' + reqId)?.value;
+
+        if (action === 'approve' && (!creditsGranted || parseInt(creditsGranted, 10) < 1)) {
+            window.sstToast('warning', 'Please enter the number of credits to grant (at least 1).');
+            return;
+        }
+
+        const row = document.getElementById('req-row-' + reqId);
+        if (row) row.style.opacity = '0.5';
+
+        try {
+            const response = await fetch(`/instructor/credit-requests/${reqId}/resolve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, creditsGranted: parseInt(creditsGranted, 10) || 0, instructorNote }),
+            });
+            const result = await response.json();
+            if (result.success) {
+                window.sstToast('success', result.message);
+                // Remove the action controls and update the status badge
+                const actionEl = document.getElementById('action-' + reqId);
+                if (actionEl) {
+                    actionEl.innerHTML = action === 'approve'
+                        ? `<span class="badge bg-success">Approved</span>`
+                        : `<span class="badge bg-secondary">Denied</span>`;
+                }
+                const statusCell = row ? row.querySelector('td:nth-child(5)') : null;
+                if (statusCell) {
+                    statusCell.innerHTML = action === 'approve'
+                        ? '<span class="badge bg-success">Approved</span>'
+                        : '<span class="badge bg-secondary">Denied</span>';
+                }
+            } else {
+                window.sstToast('error', result.message || 'Failed to resolve request.');
+            }
+        } catch (err) {
+            console.error('Error resolving request:', err);
+            window.sstToast('error', 'An error occurred.');
+        } finally {
+            if (row) row.style.opacity = '';
+        }
+    }
+
+    document.querySelectorAll('.approve-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            resolveRequest(this.dataset.reqId, 'approve');
+        });
+    });
+
+    document.querySelectorAll('.deny-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            resolveRequest(this.dataset.reqId, 'deny');
+        });
+    });
+});
+</script>

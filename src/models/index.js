@@ -8,6 +8,10 @@ const Completion = require("./Completion")(sequelize);
 const InstructorCourseSection = require("./InstructorCourseSection")(sequelize);
 const InteractionLog = require("./InteractionLog")(sequelize);
 const InstructorSectionTopicSetting = require("./InstructorSectionTopicSetting")(sequelize);
+const InstructorSectionCreditSetting = require("./InstructorSectionCreditSetting")(sequelize);
+const StudentCreditBalance = require("./StudentCreditBalance")(sequelize);
+const CreditTransaction = require("./CreditTransaction")(sequelize);
+const CreditRequest = require("./CreditRequest")(sequelize);
 
 // Define associations between models
 Topic.hasMany(Question, { foreignKey: "topicId", as: "questions" });
@@ -61,6 +65,58 @@ InstructorSectionTopicSetting.belongsTo(Topic, {
 	as: "topic",
 });
 
+// InstructorSectionCreditSetting associations
+InstructorCourseSection.hasOne(InstructorSectionCreditSetting, {
+	foreignKey: "instructorCourseSectionId",
+	as: "creditSetting",
+});
+InstructorSectionCreditSetting.belongsTo(InstructorCourseSection, {
+	foreignKey: "instructorCourseSectionId",
+	as: "section",
+});
+
+// StudentCreditBalance associations
+User.hasMany(StudentCreditBalance, { foreignKey: "userId", as: "creditBalances" });
+StudentCreditBalance.belongsTo(User, { foreignKey: "userId", as: "student" });
+InstructorCourseSection.hasMany(StudentCreditBalance, {
+	foreignKey: "instructorCourseSectionId",
+	as: "creditBalances",
+});
+StudentCreditBalance.belongsTo(InstructorCourseSection, {
+	foreignKey: "instructorCourseSectionId",
+	as: "section",
+});
+
+// CreditTransaction associations
+User.hasMany(CreditTransaction, { foreignKey: "userId", as: "creditTransactions" });
+CreditTransaction.belongsTo(User, { foreignKey: "userId", as: "student" });
+Question.hasMany(CreditTransaction, { foreignKey: "questionId", as: "creditTransactions" });
+CreditTransaction.belongsTo(Question, { foreignKey: "questionId", as: "question" });
+InstructorCourseSection.hasMany(CreditTransaction, {
+	foreignKey: "instructorCourseSectionId",
+	as: "creditTransactions",
+});
+CreditTransaction.belongsTo(InstructorCourseSection, {
+	foreignKey: "instructorCourseSectionId",
+	as: "section",
+});
+
+// CreditRequest associations
+User.hasMany(CreditRequest, { foreignKey: "userId", as: "creditRequests" });
+CreditRequest.belongsTo(User, { foreignKey: "userId", as: "student" });
+User.hasMany(CreditRequest, { foreignKey: "resolvedByUserId", as: "resolvedCreditRequests" });
+CreditRequest.belongsTo(User, { foreignKey: "resolvedByUserId", as: "resolvedBy" });
+InstructorCourseSection.hasMany(CreditRequest, {
+	foreignKey: "instructorCourseSectionId",
+	as: "creditRequests",
+});
+CreditRequest.belongsTo(InstructorCourseSection, {
+	foreignKey: "instructorCourseSectionId",
+	as: "section",
+});
+CreditRequest.hasMany(CreditTransaction, { foreignKey: "creditRequestId", as: "transactions" });
+CreditTransaction.belongsTo(CreditRequest, { foreignKey: "creditRequestId", as: "creditRequest" });
+
 // Re-export the models
 module.exports = {
 	User,
@@ -70,4 +126,8 @@ module.exports = {
 	InstructorCourseSection,
 	InteractionLog,
 	InstructorSectionTopicSetting,
+	InstructorSectionCreditSetting,
+	StudentCreditBalance,
+	CreditTransaction,
+	CreditRequest,
 };

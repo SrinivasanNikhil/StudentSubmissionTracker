@@ -144,6 +144,16 @@
                                     <button id="aiFeedbackBtn" type="button" class="btn btn-sm btn-outline-info ms-2">
                                         <i class="bi bi-robot me-1"></i> Get AI Feedback
                                     </button>
+                                    <% if (hasCreditSection) { %>
+                                    <span id="credits-label" class="ms-1 small" style="color:#8888aa; flex-shrink:0;">
+                                        <% if (creditUnlimited) { %>
+                                            <i class="bi bi-infinity"></i> Unlimited
+                                        <% } else { %>
+                                            <i class="bi bi-coin me-1"></i><span id="credits-count"><%= creditsRemaining !== null ? creditsRemaining : '—' %></span> credits
+                                            <% if (creditCost > 1) { %><span class="text-muted">(cost: <%= creditCost %>)</span><% } %>
+                                        <% } %>
+                                    </span>
+                                    <% } %>
                                     <span class="ms-auto text-muted small" id="query-char-count" style="color:#8888aa !important;"></span>
                                     <span style="color:#6c6fc4; font-size:11px; margin-left:8px; flex-shrink:0;">
                                         <kbd style="background:#2a2a4a; border:1px solid #3a3a5c; border-radius:3px; padding:1px 5px; font-size:10px; color:#a0a0c0;">Ctrl</kbd>
@@ -333,6 +343,11 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
 <!-- Hidden fields for JavaScript -->
 <input type="hidden" id="questionId" value="<%= question.id %>">
 <input type="hidden" id="solutionUnlocked" value="<%= solutionUnlocked %>">
+<input type="hidden" id="creditsRemaining" value="<%= creditsRemaining !== null && creditsRemaining !== undefined ? creditsRemaining : '' %>">
+<input type="hidden" id="creditCost" value="<%= creditCost !== null ? creditCost : 1 %>">
+<input type="hidden" id="creditUnlimited" value="<%= creditUnlimited ? 'true' : 'false' %>">
+<input type="hidden" id="hasCreditSection" value="<%= hasCreditSection ? 'true' : 'false' %>">
+<input type="hidden" id="hasPendingCreditRequest" value="<%= hasPendingCreditRequest ? 'true' : 'false' %>">
 
 
 <!-- JavaScript for SQL Editor -->
@@ -802,10 +817,76 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
             }
         });
 
-        // On-demand AI feedback button
+        // On-demand AI feedback button (credit-aware)
         const aiFeedbackBtn = document.getElementById('aiFeedbackBtn');
         const aiFeedbackPanel = document.getElementById('realtime-feedback');
         const aiFeedbackLoading = document.getElementById('realtime-loading');
+
+        const hasCreditSection = document.getElementById('hasCreditSection')?.value === 'true';
+        const creditUnlimited = document.getElementById('creditUnlimited')?.value === 'true';
+        let creditsRemaining = parseInt(document.getElementById('creditsRemaining')?.value ?? '', 10);
+        const creditCost = parseInt(document.getElementById('creditCost')?.value ?? '1', 10);
+        let hasPendingCreditRequest = document.getElementById('hasPendingCreditRequest')?.value === 'true';
+
+        function updateCreditsLabel(newRemaining) {
+            const countEl = document.getElementById('credits-count');
+            if (countEl) {
+                countEl.textContent = newRemaining;
+                countEl.closest('#credits-label') && (countEl.closest('#credits-label').style.color = newRemaining === 0 ? '#dc2626' : '#8888aa');
+            }
+        }
+
+        function renderNoCreditsUI() {
+            const requestHtml = hasPendingCreditRequest
+                ? `<div class="alert alert-info mt-2 mb-0 small"><i class="bi bi-hourglass-split me-1"></i>Your credit request is pending. Check back after your instructor responds.</div>`
+                : `<div class="mt-2">
+                    <label class="form-label small text-muted">Message to instructor (optional):</label>
+                    <textarea id="creditRequestMessage" class="form-control form-control-sm mb-2" rows="2" maxlength="500" placeholder="Explain why you need more credits…"></textarea>
+                    <button id="requestCreditsBtn" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-send me-1"></i>Request More Credits
+                    </button>
+                   </div>`;
+
+            aiFeedbackPanel.innerHTML = `
+                <div class="alert alert-warning mb-2">
+                    <i class="bi bi-coin me-1"></i>
+                    <strong>No AI credits remaining.</strong>
+                    You have used all <strong>${creditsRemaining ?? 0}</strong> of your AI feedback credits (cost: ${creditCost} per use).
+                </div>
+                ${requestHtml}`;
+
+            const requestBtn = document.getElementById('requestCreditsBtn');
+            if (requestBtn) {
+                requestBtn.addEventListener('click', async function () {
+                    if (hasPendingCreditRequest) return;
+                    const msg = document.getElementById('creditRequestMessage')?.value || '';
+                    requestBtn.disabled = true;
+                    requestBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending…';
+                    try {
+                        const resp = await fetch('/questions/credits/request', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: msg }),
+                        });
+                        const res = await resp.json();
+                        if (res.success) {
+                            hasPendingCreditRequest = true;
+                            document.getElementById('hasPendingCreditRequest').value = 'true';
+                            window.sstToast('success', 'Credit request sent to your instructor.');
+                            renderNoCreditsUI();
+                        } else {
+                            window.sstToast('warning', res.message || 'Could not submit request.');
+                            requestBtn.disabled = false;
+                            requestBtn.innerHTML = '<i class="bi bi-send me-1"></i>Request More Credits';
+                        }
+                    } catch (e) {
+                        window.sstToast('error', 'An error occurred. Please try again.');
+                        requestBtn.disabled = false;
+                        requestBtn.innerHTML = '<i class="bi bi-send me-1"></i>Request More Credits';
+                    }
+                });
+            }
+        }
 
         aiFeedbackBtn.addEventListener('click', async function () {
             const query = sqlQuery.value.trim();
@@ -824,8 +905,16 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                     body: JSON.stringify({ query })
                 });
                 const result = await response.json();
-                if (result.success) {
+                if (response.status === 403 && result.code === 'NO_CREDITS') {
+                    creditsRemaining = result.creditsRemaining ?? 0;
+                    updateCreditsLabel(creditsRemaining);
+                    renderNoCreditsUI();
+                } else if (result.success) {
                     aiFeedbackPanel.innerHTML = result.analysis;
+                    if (hasCreditSection && !creditUnlimited && result.creditsRemaining !== undefined) {
+                        creditsRemaining = result.creditsRemaining;
+                        updateCreditsLabel(creditsRemaining);
+                    }
                 } else {
                     aiFeedbackPanel.innerHTML = `<div class="alert alert-warning">${result.message || 'Failed to analyze query'}</div>`;
                 }

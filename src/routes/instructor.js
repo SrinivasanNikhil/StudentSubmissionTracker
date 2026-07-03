@@ -7,6 +7,10 @@ const {
 	Topic,
 	InstructorCourseSection,
 	InteractionLog,
+	CreditRequest,
+	StudentCreditBalance,
+	CreditTransaction,
+	InstructorSectionCreditSetting,
 } = require("../models");
 const { isAuthenticated, isInstructor } = require("../middleware/auth");
 const { Op } = require("sequelize");
@@ -108,6 +112,21 @@ router.get("/dashboard", isAuthenticated, isInstructor, async (req, res) => {
 			limit: 10,
 		});
 
+		// Pending AI credit request count across all sections
+		const allSections = await InstructorCourseSection.findAll({
+			where: { instructorId },
+			attributes: ["id"],
+		});
+		const allSectionIds = allSections.map((s) => s.id);
+		const pendingCreditRequestCount = allSectionIds.length
+			? await CreditRequest.count({
+				where: {
+					instructorCourseSectionId: { [Op.in]: allSectionIds },
+					status: "pending",
+				},
+			  })
+			: 0;
+
 		res.render("pages/instructor/dashboard", {
 			title: "Instructor Dashboard",
 			students: studentsWithCounts,
@@ -116,6 +135,7 @@ router.get("/dashboard", isAuthenticated, isInstructor, async (req, res) => {
 			totalQuestions,
 			completionRate,
 			engagementRate,
+			pendingCreditRequestCount,
 			stats: {
 				totalStudents,
 				totalCompletions,
@@ -714,5 +734,147 @@ router.post(
 		}
 	}
 );
+
+// List credit requests across all sections for this instructor
+router.get("/credit-requests", isAuthenticated, isInstructor, async (req, res) => {
+	try {
+		const instructorId = req.session.user.id;
+		const statusFilter = req.query.status || "pending";
+
+		const sections = await InstructorCourseSection.findAll({
+			where: { instructorId },
+			attributes: ["id"],
+		});
+		const sectionIds = sections.map((s) => s.id);
+
+		const whereClause = { instructorCourseSectionId: { [Op.in]: sectionIds } };
+		if (statusFilter !== "all") whereClause.status = statusFilter;
+
+		const requests = await CreditRequest.findAll({
+			where: whereClause,
+			include: [
+				{ model: User, as: "student", attributes: ["id", "firstName", "lastName", "email"] },
+				{ model: InstructorCourseSection, as: "section", attributes: ["id", "courseCode", "sectionCode", "courseName"] },
+			],
+			order: [["requestedAt", "DESC"]],
+		});
+
+		const pendingCount = await CreditRequest.count({
+			where: { instructorCourseSectionId: { [Op.in]: sectionIds }, status: "pending" },
+		});
+
+		res.render("pages/instructor/credit-requests", {
+			title: "AI Credit Requests",
+			requests,
+			statusFilter,
+			pendingCount,
+		});
+	} catch (error) {
+		console.error("Credit requests list error:", error);
+		res.status(500).render("pages/error", {
+			title: "Error",
+			message: "An error occurred while loading credit requests.",
+		});
+	}
+});
+
+// Resolve a credit request (approve or deny)
+router.post("/credit-requests/:id/resolve", isAuthenticated, isInstructor, async (req, res) => {
+	try {
+		const instructorId = req.session.user.id;
+		const { id } = req.params;
+		const { action, creditsGranted, instructorNote } = req.body;
+
+		const sections = await InstructorCourseSection.findAll({
+			where: { instructorId },
+			attributes: ["id"],
+		});
+		const sectionIds = sections.map((s) => s.id);
+
+		const request = await CreditRequest.findOne({
+			where: { id, instructorCourseSectionId: { [Op.in]: sectionIds }, status: "pending" },
+		});
+
+		if (!request) {
+			return res.status(404).json({ success: false, message: "Request not found or already resolved" });
+		}
+
+		if (action === "approve") {
+			const grantAmount = parseInt(creditsGranted, 10);
+			if (!grantAmount || grantAmount < 1) {
+				return res.status(400).json({ success: false, message: "Credits granted must be at least 1" });
+			}
+
+			const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+			const semester = InstructorCourseSection.getCurrentSemester();
+
+			let balance = await StudentCreditBalance.findOne({
+				where: {
+					userId: request.userId,
+					instructorCourseSectionId: request.instructorCourseSectionId,
+					academicYear,
+					semester,
+				},
+			});
+
+			if (!balance) {
+				const setting = await InstructorSectionCreditSetting.findOne({
+					where: { instructorCourseSectionId: request.instructorCourseSectionId },
+				});
+				const seed = setting ? setting.defaultCredits : 10;
+				balance = await StudentCreditBalance.create({
+					userId: request.userId,
+					instructorCourseSectionId: request.instructorCourseSectionId,
+					academicYear,
+					semester,
+					creditsRemaining: seed,
+					creditsGrantedTotal: seed,
+				});
+			}
+
+			const newRemaining = balance.creditsRemaining + grantAmount;
+			await balance.update({
+				creditsRemaining: newRemaining,
+				creditsGrantedTotal: balance.creditsGrantedTotal + grantAmount,
+			});
+
+			await request.update({
+				status: "approved",
+				resolvedAt: new Date(),
+				resolvedByUserId: instructorId,
+				creditsGranted: grantAmount,
+				instructorNote: instructorNote ? String(instructorNote).slice(0, 500) : null,
+			});
+
+			await CreditTransaction.create({
+				userId: request.userId,
+				questionId: null,
+				instructorCourseSectionId: request.instructorCourseSectionId,
+				creditRequestId: request.id,
+				type: "grant",
+				amount: grantAmount,
+				balanceAfter: newRemaining,
+				academicYear,
+				semester,
+				occurredAt: new Date(),
+			});
+
+			return res.json({ success: true, message: `Approved — granted ${grantAmount} credits.` });
+		} else if (action === "deny") {
+			await request.update({
+				status: "denied",
+				resolvedAt: new Date(),
+				resolvedByUserId: instructorId,
+				instructorNote: instructorNote ? String(instructorNote).slice(0, 500) : null,
+			});
+			return res.json({ success: true, message: "Request denied." });
+		} else {
+			return res.status(400).json({ success: false, message: "Invalid action. Use 'approve' or 'deny'." });
+		}
+	} catch (error) {
+		console.error("Resolve credit request error:", error);
+		return res.status(500).json({ success: false, message: "Failed to resolve credit request." });
+	}
+});
 
 module.exports = router;

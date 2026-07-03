@@ -1,0 +1,237 @@
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/instructor/dashboard">Instructor Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/instructor/course-management/course-sections">Course Sections</a></li>
+            <li class="breadcrumb-item active" aria-current="page">AI Credits</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>AI Credit Settings</h1>
+            <p class="text-muted mb-0">
+                <strong><%= courseSection.getDisplayName() %></strong>
+                &mdash; <%= courseSection.semester %> <%= courseSection.academicYear %>
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/instructor/credit-requests" class="btn btn-outline-warning">
+                <i class="bi bi-inbox me-1"></i> Credit Requests
+            </a>
+            <a href="/instructor/course-management/course-sections/<%= courseSection.id %>/students"
+               class="btn btn-outline-secondary">
+                <i class="bi bi-people me-1"></i> View Students
+            </a>
+        </div>
+    </div>
+
+    <!-- Section-wide credit settings -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Section Credit Configuration</h5>
+            <small class="text-muted">Changes are saved automatically. These settings apply to all students in this section.</small>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-medium">Default Starting Credits</label>
+                    <input type="number" min="0" class="form-control" id="defaultCreditsInput"
+                           value="<%= creditSetting.defaultCredits %>"
+                           <%= creditSetting.unlimited ? 'disabled' : '' %>>
+                    <small class="text-muted">Seeded to new students on first AI feedback use.</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-medium">Cost per AI Feedback Click</label>
+                    <input type="number" min="1" class="form-control" id="costPerRequestInput"
+                           value="<%= creditSetting.costPerRequest %>"
+                           <%= creditSetting.unlimited ? 'disabled' : '' %>>
+                    <small class="text-muted">Credits deducted per button click.</small>
+                </div>
+                <div class="col-md-3 d-flex align-items-center pt-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="unlimitedToggle"
+                               style="width: 2.5em; height: 1.4em; cursor: pointer;"
+                               <%= creditSetting.unlimited ? 'checked' : '' %>>
+                        <label class="form-check-label fw-medium ms-2" for="unlimitedToggle">Unlimited Mode</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div id="settingsSaveStatus" class="text-muted small"></div>
+                </div>
+            </div>
+            <% if (creditSetting.unlimited) { %>
+            <div class="alert alert-info mt-3 mb-0">
+                <i class="bi bi-infinity me-2"></i>
+                <strong>Unlimited mode is on.</strong> Students in this section can use AI Feedback without a credit limit.
+                Usage (tokens and cost) is still recorded for research purposes.
+            </div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Per-student credit balances -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0">Student Balances</h5>
+                <small class="text-muted"><%= academicYear %> &mdash; <%= semester %></small>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <% if (students.length === 0) { %>
+                <div class="text-center py-4 text-muted">No students enrolled in this section yet.</div>
+            <% } else { %>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student</th>
+                            <th class="text-center">Credits Remaining</th>
+                            <th class="text-center">Total Granted</th>
+                            <% if (!creditSetting.unlimited) { %>
+                            <th style="width: 240px;">Grant Additional Credits</th>
+                            <% } %>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% students.forEach(student => { %>
+                        <tr id="student-row-<%= student.id %>">
+                            <td>
+                                <strong><%= student.firstName || '' %> <%= student.lastName || '' %></strong>
+                                <% if (!student.firstName && !student.lastName) { %><span class="text-muted">Not provided</span><% } %>
+                                <br><small class="text-muted"><%= student.email %></small>
+                            </td>
+                            <td class="text-center" id="remaining-<%= student.id %>">
+                                <% if (creditSetting.unlimited) { %>
+                                    <span class="badge bg-info"><i class="bi bi-infinity"></i> Unlimited</span>
+                                <% } else if (student.creditsRemaining === null) { %>
+                                    <span class="text-muted small">Not yet used</span>
+                                <% } else { %>
+                                    <span class="fw-semibold <%= student.creditsRemaining === 0 ? 'text-danger' : 'text-success' %>">
+                                        <%= student.creditsRemaining %>
+                                    </span>
+                                <% } %>
+                            </td>
+                            <td class="text-center" id="granted-<%= student.id %>">
+                                <% if (creditSetting.unlimited) { %>
+                                    <span class="text-muted">—</span>
+                                <% } else { %>
+                                    <%= student.creditsGrantedTotal !== null ? student.creditsGrantedTotal : '—' %>
+                                <% } %>
+                            </td>
+                            <% if (!creditSetting.unlimited) { %>
+                            <td>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" min="1" class="form-control grant-amount-input"
+                                           id="grant-<%= student.id %>"
+                                           data-student-id="<%= student.id %>"
+                                           placeholder="Amount" style="max-width:90px;">
+                                    <button class="btn btn-outline-success grant-btn"
+                                            data-student-id="<%= student.id %>">
+                                        <i class="bi bi-plus-circle me-1"></i>Grant
+                                    </button>
+                                </div>
+                            </td>
+                            <% } %>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const sectionId = <%= courseSection.id %>;
+
+    // Auto-save credit settings
+    async function saveSettings() {
+        const defaultCredits = document.getElementById('defaultCreditsInput').value;
+        const costPerRequest = document.getElementById('costPerRequestInput').value;
+        const unlimited = document.getElementById('unlimitedToggle').checked;
+        const statusEl = document.getElementById('settingsSaveStatus');
+        statusEl.textContent = 'Saving...';
+
+        try {
+            const response = await fetch(
+                `/instructor/course-management/course-sections/${sectionId}/credits/settings`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ defaultCredits, costPerRequest, unlimited }),
+                }
+            );
+            const result = await response.json();
+            if (result.success) {
+                window.sstToast('success', 'Credit settings saved.');
+                statusEl.textContent = '';
+            } else {
+                window.sstToast('error', 'Failed to save: ' + (result.message || 'Unknown error'));
+                statusEl.textContent = '';
+            }
+        } catch (err) {
+            console.error('Error saving credit settings:', err);
+            window.sstToast('error', 'An error occurred while saving.');
+            statusEl.textContent = '';
+        }
+    }
+
+    // Unlimited toggle disables/enables the other inputs and saves
+    document.getElementById('unlimitedToggle').addEventListener('change', function () {
+        const isUnlimited = this.checked;
+        document.getElementById('defaultCreditsInput').disabled = isUnlimited;
+        document.getElementById('costPerRequestInput').disabled = isUnlimited;
+        saveSettings();
+    });
+
+    document.getElementById('defaultCreditsInput').addEventListener('change', saveSettings);
+    document.getElementById('costPerRequestInput').addEventListener('change', saveSettings);
+
+    // Per-student grant buttons
+    document.querySelectorAll('.grant-btn').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            const studentId = this.dataset.studentId;
+            const amountInput = document.getElementById('grant-' + studentId);
+            const amount = parseInt(amountInput.value, 10);
+
+            if (!amount || amount < 1) {
+                window.sstToast('warning', 'Please enter a valid amount (at least 1).');
+                return;
+            }
+
+            btn.disabled = true;
+            try {
+                const response = await fetch(
+                    `/instructor/course-management/course-sections/${sectionId}/credits/grant`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: studentId, amount }),
+                    }
+                );
+                const result = await response.json();
+                if (result.success) {
+                    window.sstToast('success', `Granted ${amount} credits.`);
+                    amountInput.value = '';
+                    // Update displayed balance
+                    const remainingEl = document.getElementById('remaining-' + studentId);
+                    const grantedEl = document.getElementById('granted-' + studentId);
+                    if (remainingEl) remainingEl.innerHTML = `<span class="fw-semibold text-success">${result.creditsRemaining}</span>`;
+                    if (grantedEl) grantedEl.textContent = result.creditsGrantedTotal;
+                } else {
+                    window.sstToast('error', result.message || 'Failed to grant credits.');
+                }
+            } catch (err) {
+                console.error('Error granting credits:', err);
+                window.sstToast('error', 'An error occurred while granting credits.');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    });
+});
+</script>

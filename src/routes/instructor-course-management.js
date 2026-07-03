@@ -7,6 +7,9 @@ const {
 	Topic,
 	InstructorCourseSection,
 	InstructorSectionTopicSetting,
+	InstructorSectionCreditSetting,
+	StudentCreditBalance,
+	CreditTransaction,
 } = require("../models");
 const { isAuthenticated, isInstructor } = require("../middleware/auth");
 const { Op, fn, col } = require("sequelize");
@@ -367,6 +370,221 @@ router.post(
 				success: false,
 				message: "Failed to save topic settings",
 			});
+		}
+	}
+);
+
+// View and manage AI credit settings for a course section
+router.get(
+	"/course-sections/:id/credits",
+	isAuthenticated,
+	isInstructor,
+	async (req, res) => {
+		try {
+			const instructorId = req.session.user.id;
+			const { id } = req.params;
+
+			const courseSection = await InstructorCourseSection.findOne({
+				where: { id, instructorId },
+			});
+
+			if (!courseSection) {
+				return res.status(404).render("pages/error", {
+					title: "Course Section Not Found",
+					message: "The requested course section was not found.",
+				});
+			}
+
+			const creditSetting = await InstructorSectionCreditSetting.findOne({
+				where: { instructorCourseSectionId: id },
+			});
+
+			// Get students in this section with their credit balances
+			const students = await User.findAll({
+				where: {
+					associatedInstructorId: instructorId,
+					role: "student",
+					courseSection: courseSection.getFullSectionIdentifier(),
+				},
+				attributes: ["id", "email", "firstName", "lastName"],
+				order: [["lastName", "ASC"], ["firstName", "ASC"]],
+			});
+
+			const studentIds = students.map((s) => s.id);
+			const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+			const semester = InstructorCourseSection.getCurrentSemester();
+
+			const balances = studentIds.length
+				? await StudentCreditBalance.findAll({
+					where: {
+						userId: { [Op.in]: studentIds },
+						instructorCourseSectionId: id,
+						academicYear,
+						semester,
+					},
+				  })
+				: [];
+
+			const balanceMap = new Map(balances.map((b) => [b.userId, b]));
+
+			const studentsWithBalances = students.map((s) => {
+				const b = balanceMap.get(s.id);
+				return {
+					...s.toJSON(),
+					creditsRemaining: b ? b.creditsRemaining : null,
+					creditsGrantedTotal: b ? b.creditsGrantedTotal : null,
+					balanceId: b ? b.id : null,
+				};
+			});
+
+			res.render("pages/instructor/section-credits", {
+				title: `${courseSection.getDisplayName()} - AI Credits`,
+				courseSection,
+				creditSetting: creditSetting || { defaultCredits: 10, costPerRequest: 1, unlimited: false },
+				students: studentsWithBalances,
+				academicYear,
+				semester,
+			});
+		} catch (error) {
+			console.error("Section credits error:", error);
+			res.status(500).render("pages/error", {
+				title: "Error",
+				message: "An error occurred while loading credit settings.",
+			});
+		}
+	}
+);
+
+// Save credit settings for a course section
+router.post(
+	"/course-sections/:id/credits/settings",
+	isAuthenticated,
+	isInstructor,
+	async (req, res) => {
+		try {
+			const instructorId = req.session.user.id;
+			const { id } = req.params;
+
+			const courseSection = await InstructorCourseSection.findOne({
+				where: { id, instructorId },
+			});
+
+			if (!courseSection) {
+				return res.status(404).json({ success: false, message: "Course section not found" });
+			}
+
+			const defaultCredits = Math.max(0, parseInt(req.body.defaultCredits, 10) || 10);
+			const costPerRequest = Math.max(1, parseInt(req.body.costPerRequest, 10) || 1);
+			const unlimited = Boolean(req.body.unlimited);
+
+			await InstructorSectionCreditSetting.upsert({
+				instructorCourseSectionId: parseInt(id),
+				defaultCredits,
+				costPerRequest,
+				unlimited,
+			});
+
+			return res.json({ success: true });
+		} catch (error) {
+			console.error("Save credit settings error:", error);
+			return res.status(500).json({ success: false, message: "Failed to save credit settings" });
+		}
+	}
+);
+
+// Grant credits directly to a student
+router.post(
+	"/course-sections/:id/credits/grant",
+	isAuthenticated,
+	isInstructor,
+	async (req, res) => {
+		try {
+			const instructorId = req.session.user.id;
+			const { id } = req.params;
+			const { userId, amount } = req.body;
+
+			const courseSection = await InstructorCourseSection.findOne({
+				where: { id, instructorId },
+			});
+
+			if (!courseSection) {
+				return res.status(404).json({ success: false, message: "Course section not found" });
+			}
+
+			const grantAmount = parseInt(amount, 10);
+			if (!grantAmount || grantAmount < 1) {
+				return res.status(400).json({ success: false, message: "Amount must be at least 1" });
+			}
+
+			const student = await User.findOne({
+				where: { id: userId, role: "student", associatedInstructorId: instructorId },
+			});
+
+			if (!student) {
+				return res.status(404).json({ success: false, message: "Student not found" });
+			}
+
+			const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+			const semester = InstructorCourseSection.getCurrentSemester();
+
+			let balance = await StudentCreditBalance.findOne({
+				where: { userId, instructorCourseSectionId: id, academicYear, semester },
+			});
+
+			if (!balance) {
+				const setting = await InstructorSectionCreditSetting.findOne({
+					where: { instructorCourseSectionId: id },
+				});
+				const seed = setting ? setting.defaultCredits : 10;
+				balance = await StudentCreditBalance.create({
+					userId,
+					instructorCourseSectionId: parseInt(id),
+					academicYear,
+					semester,
+					creditsRemaining: seed,
+					creditsGrantedTotal: seed,
+				});
+				await CreditTransaction.create({
+					userId,
+					questionId: null,
+					instructorCourseSectionId: parseInt(id),
+					type: "seed",
+					amount: seed,
+					balanceAfter: seed,
+					academicYear,
+					semester,
+					occurredAt: new Date(),
+				});
+			}
+
+			const newRemaining = balance.creditsRemaining + grantAmount;
+			const newGrantedTotal = balance.creditsGrantedTotal + grantAmount;
+
+			await balance.update({
+				creditsRemaining: newRemaining,
+				creditsGrantedTotal: newGrantedTotal,
+			});
+
+			await CreditTransaction.create({
+				userId,
+				questionId: null,
+				instructorCourseSectionId: parseInt(id),
+				type: "grant",
+				amount: grantAmount,
+				balanceAfter: newRemaining,
+				academicYear,
+				semester,
+				occurredAt: new Date(),
+			});
+
+			return res.json({
+				success: true,
+				creditsRemaining: newRemaining,
+				creditsGrantedTotal: newGrantedTotal,
+			});
+		} catch (error) {
+			console.error("Grant credits error:", error);
+			return res.status(500).json({ success: false, message: "Failed to grant credits" });
 		}
 	}
 );
