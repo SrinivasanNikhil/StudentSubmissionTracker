@@ -12,6 +12,7 @@ A comprehensive web application designed to help university students track and m
 - **Fuzzy Completion**: Questions are marked complete when row count and column count match — column alias differences no longer block completion
 - **Solution Unlock**: Reference solution and AI comparison are hidden until a student has made ≥ 5 attempts with at least 75% of expected rows matched (or the question is already completed)
 - **Due Date Awareness**: Topics with deadlines show warning/danger badges; submitting after the deadline still executes the query but does not record a completion
+- **Assignment/Practice Badges**: Each topic shows whether it's classified as a graded Assignment or ungraded Practice for the student's course section, on both the topics list and the question list
 - **ER Diagram Submissions**: Upload and submit ER diagrams for data modeling questions
 - **Progress Tracking**: Monitor completion status across all topics and question types
 - **Student Dashboard**: View submitted diagrams and instructor feedback
@@ -23,7 +24,7 @@ A comprehensive web application designed to help university students track and m
 
 - **Instructor Dashboard**: Comprehensive dashboard for course and student management
 - **Course Section Management**: Create and manage multiple course sections per semester
-- **Per-Section Topic Settings**: Control which topics are visible to each course section and set per-topic due dates — managed via a dedicated settings page accessible from the Course Sections list
+- **Per-Section Topic Settings**: Control which topics are visible to each course section, set per-topic due dates, and classify each topic as Assignment (graded) or Practice (ungraded) — managed via a dedicated settings page accessible from the Course Sections list
 - **Student Enrollment Tracking**: View students enrolled in each course section
 - **Semester-Based Organization**: Organize courses by academic year and semester
 - **Progress Monitoring**: Track student progress across all course sections
@@ -238,7 +239,7 @@ StudentSubmissionTracker/
 - **Completion**: Tracks user progress and submissions with semester information
 - **Session**: Manages user sessions for authentication
 - **InstructorCourseSection**: Manages course sections with semester and academic year tracking
-- **InstructorSectionTopicSetting**: Per-section, per-topic configuration — stores `isVisible` (whether the topic is shown to students in a section) and `dueDate` (optional deadline after which completions are not recorded). One row per `(section, topic)` pair; rows are created on first save and upserted on subsequent changes
+- **InstructorSectionTopicSetting**: Per-section, per-topic configuration — stores `isVisible` (whether the topic is shown to students in a section), `dueDate` (optional deadline after which completions are not recorded), `gracePeriodMinutes` (grace window after the due date during which completions still count), and `assignmentType` (`assignment` or `practice` classification, default `practice`). One row per `(section, topic)` pair; rows are created on first save and upserted on subsequent changes
 
 ## API Endpoints
 
@@ -408,6 +409,7 @@ Ensure all required environment variables are set in `.env`:
 
 ## Recent Updates
 
+- ✅ **Assignment/Practice Classification**: Instructors can classify each topic, per course section, as an Assignment (graded) or Practice (ungraded) topic from the Topic Settings page. Shown as a badge on the student topics list and question list. Label-only for now — it does not yet change due-date enforcement, credit gating, or CSV export contents
 - ✅ **📤 Export Center**: Consolidated 9 scattered export routes/buttons into one Export Center page per role (`/instructor/export`, `/admin/export`). Offers four shared export types — Topic Completion Summary, Detailed Question Attempts (new: per-student-per-question attempt counts, best-match %, and scores), Student Completion Matrix, plus role-specific ER Diagram Submissions (instructor) / Instructor Directory (admin) — all filterable by academic year, semester, and course section. All completion-style CSV cells are numeric `1`/`0`, and no cell ever combines a numerator/denominator into one string (e.g. `"3/5"`) — topic/question counts are always split into separate numeric columns so the CSV imports cleanly into D2L's grade-import tool
 - ✅ **Per-Section Topic Visibility**: Instructors can now hide specific topics from individual course sections via a new Topic Settings page (accessible from the Course Sections list). Hidden topics are filtered from the student topics list and blocked at the question-list URL level
 - ✅ **Per-Section Due Dates**: Instructors can set a per-topic deadline per course section. After the deadline, queries still execute and results are shown, but completions are not recorded. Warning/danger badges appear on topic and question-list pages
