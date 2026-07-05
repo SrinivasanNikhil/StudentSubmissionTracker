@@ -33,6 +33,7 @@
                         <tr>
                             <th>Topic</th>
                             <th>Type</th>
+                            <th style="width: 140px;">Classification</th>
                             <th class="text-center" style="width: 120px;">Visible to Students</th>
                             <th style="width: 260px;">Due Date</th>
                             <th style="width: 140px;">Grace (min)</th>
@@ -54,6 +55,14 @@
                                     <% } else { %>
                                         <span class="badge bg-secondary"><%= topic.type %></span>
                                     <% } %>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm topic-assignment-type"
+                                            id="assignment-type-<%= topic.id %>"
+                                            data-topic-id="<%= topic.id %>">
+                                        <option value="assignment" <%= topic.assignmentType === 'assignment' ? 'selected' : '' %>>Assignment</option>
+                                        <option value="practice" <%= topic.assignmentType !== 'assignment' ? 'selected' : '' %>>Practice</option>
+                                    </select>
                                 </td>
                                 <td class="text-center">
                                     <div class="form-check form-switch d-flex justify-content-center mb-0">
@@ -93,7 +102,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const sectionId = <%= courseSection.id %>;
 
-    async function saveSetting(topicId, isVisible, dueDate, gracePeriodMinutes) {
+    async function saveSetting(topicId, isVisible, dueDate, gracePeriodMinutes, assignmentType) {
         const row = document.getElementById('row-' + topicId);
         if (row) {
             row.style.opacity = '0.5';
@@ -110,6 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         isVisible: Boolean(isVisible),
                         dueDate: dueDate || '',
                         gracePeriodMinutes: gracePeriodMinutes || 0,
+                        assignmentType: assignmentType || 'practice',
                     }),
                 }
             );
@@ -136,7 +146,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const isVisible = this.checked;
             const dueDateInput = document.getElementById('duedate-' + topicId);
             const graceInput = document.getElementById('grace-' + topicId);
-            saveSetting(topicId, isVisible, dueDateInput ? dueDateInput.value : '', graceInput ? graceInput.value : 0);
+            const assignmentTypeSelect = document.getElementById('assignment-type-' + topicId);
+            saveSetting(topicId, isVisible, dueDateInput ? dueDateInput.value : '', graceInput ? graceInput.value : 0, assignmentTypeSelect ? assignmentTypeSelect.value : 'practice');
         });
     });
 
@@ -147,7 +158,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const visibleToggle = document.getElementById('visible-' + topicId);
             const isVisible = visibleToggle ? visibleToggle.checked : true;
             const graceInput = document.getElementById('grace-' + topicId);
-            saveSetting(topicId, isVisible, dueDate, graceInput ? graceInput.value : 0);
+            const assignmentTypeSelect = document.getElementById('assignment-type-' + topicId);
+            saveSetting(topicId, isVisible, dueDate, graceInput ? graceInput.value : 0, assignmentTypeSelect ? assignmentTypeSelect.value : 'practice');
         });
     });
 
@@ -158,7 +170,20 @@ document.addEventListener('DOMContentLoaded', function () {
             const visibleToggle = document.getElementById('visible-' + topicId);
             const isVisible = visibleToggle ? visibleToggle.checked : true;
             const dueDateInput = document.getElementById('duedate-' + topicId);
-            saveSetting(topicId, isVisible, dueDateInput ? dueDateInput.value : '', gracePeriodMinutes);
+            const assignmentTypeSelect = document.getElementById('assignment-type-' + topicId);
+            saveSetting(topicId, isVisible, dueDateInput ? dueDateInput.value : '', gracePeriodMinutes, assignmentTypeSelect ? assignmentTypeSelect.value : 'practice');
+        });
+    });
+
+    document.querySelectorAll('.topic-assignment-type').forEach(function (select) {
+        select.addEventListener('change', function () {
+            const topicId = this.dataset.topicId;
+            const assignmentType = this.value;
+            const visibleToggle = document.getElementById('visible-' + topicId);
+            const isVisible = visibleToggle ? visibleToggle.checked : true;
+            const dueDateInput = document.getElementById('duedate-' + topicId);
+            const graceInput = document.getElementById('grace-' + topicId);
+            saveSetting(topicId, isVisible, dueDateInput ? dueDateInput.value : '', graceInput ? graceInput.value : 0, assignmentType);
         });
     });
 

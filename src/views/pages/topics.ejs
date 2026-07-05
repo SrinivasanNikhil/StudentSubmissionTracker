@@ -42,6 +42,11 @@
                             <p class="card-text text-muted flex-grow-1">
                                 Practice questions related to <%= topic.name.toLowerCase() %> in SQL.
                             </p>
+                            <div class="mt-2">
+                                <span class="badge <%= topic.assignmentType === 'assignment' ? 'bg-dark' : 'bg-light text-dark border' %>">
+                                    <%= topic.assignmentType === 'assignment' ? 'Assignment' : 'Practice' %>
+                                </span>
+                            </div>
                             <% if (topic.dueDate) { %>
                             <div class="mt-2">
                                 <span class="badge <%= topic.isPastDue ? 'bg-danger' : 'bg-warning text-dark' %>">

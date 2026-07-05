@@ -33,6 +33,13 @@ module.exports = (sequelize) => {
 				defaultValue: 0,
 				field: "grace_period_minutes",
 			},
+			assignmentType: {
+				type: DataTypes.STRING(20),
+				allowNull: false,
+				defaultValue: "practice",
+				field: "assignment_type",
+				comment: "Classification of this topic for this section: assignment (graded) or practice (ungraded)",
+			},
 		},
 		{
 			sequelize,

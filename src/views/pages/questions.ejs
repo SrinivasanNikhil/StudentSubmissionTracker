@@ -14,6 +14,11 @@
             <h1 class="display-4 mb-3">
                 <i class="bi bi-database me-2"></i>
                 <%= topic.name %>
+                <% if (typeof topicAssignmentType !== 'undefined') { %>
+                    <span class="badge <%= topicAssignmentType === 'assignment' ? 'bg-dark' : 'bg-light text-dark border' %> align-middle" style="font-size: 0.9rem;">
+                        <%= topicAssignmentType === 'assignment' ? 'Assignment' : 'Practice' %>
+                    </span>
+                <% } %>
             </h1>
             <% if (topic.type==='sql' ) { %>
                 <p class="lead text-muted">

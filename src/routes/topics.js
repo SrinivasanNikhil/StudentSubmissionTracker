@@ -30,7 +30,7 @@ router.get("/", isAuthenticated, async (req, res) => {
 			if (section) {
 				const sectionSettings = await InstructorSectionTopicSetting.findAll({
 					where: { instructorCourseSectionId: section.id },
-					attributes: ["topicId", "isVisible", "dueDate"],
+					attributes: ["topicId", "isVisible", "dueDate", "assignmentType"],
 				});
 
 				const settingsMap = new Map(sectionSettings.map((s) => [s.topicId, s]));
@@ -43,10 +43,11 @@ router.get("/", isAuthenticated, async (req, res) => {
 						isPastDue: settingsMap.get(t.id)?.dueDate
 							? new Date(settingsMap.get(t.id).dueDate) < new Date()
 							: false,
+						assignmentType: settingsMap.get(t.id)?.assignmentType || "practice",
 					}));
 			} else {
 				// No matching section (e.g. no associatedInstructorId) — show all topics as plain objects
-				visibleTopics = topics.map((t) => ({ ...t.toJSON(), dueDate: null, isPastDue: false }));
+				visibleTopics = topics.map((t) => ({ ...t.toJSON(), dueDate: null, isPastDue: false, assignmentType: "practice" }));
 			}
 
 			// Add per-topic completion counts for student with a section
@@ -86,6 +87,7 @@ router.get("/", isAuthenticated, async (req, res) => {
 				...t.toJSON(),
 				totalCount: 0,
 				completedCount: 0,
+				assignmentType: "practice",
 			}));
 		}
 

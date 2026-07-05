@@ -314,6 +314,7 @@ router.get(
 					isVisible: setting ? setting.isVisible : true,
 					dueDate: setting ? setting.dueDate : null,
 					gracePeriodMinutes: setting ? setting.gracePeriodMinutes : 0,
+					assignmentType: setting ? setting.assignmentType : "practice",
 				};
 			});
 
@@ -353,7 +354,7 @@ router.post(
 				});
 			}
 
-			const { topicId, isVisible, dueDate, gracePeriodMinutes } = req.body;
+			const { topicId, isVisible, dueDate, gracePeriodMinutes, assignmentType } = req.body;
 
 			await InstructorSectionTopicSetting.upsert({
 				instructorCourseSectionId: parseInt(id),
@@ -361,6 +362,7 @@ router.post(
 				isVisible: Boolean(isVisible),
 				dueDate: dueDate || null,
 				gracePeriodMinutes: parseInt(gracePeriodMinutes, 10) || 0,
+				assignmentType: assignmentType === "assignment" ? "assignment" : "practice",
 			});
 
 			return res.json({ success: true });

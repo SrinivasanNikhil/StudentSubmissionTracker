@@ -212,6 +212,7 @@ router.get("/topic/:topicId", isAuthenticated, async (req, res) => {
 		// Check visibility for students in a course section
 		let topicDueDate = null;
 		let topicIsPastDue = false;
+		let topicAssignmentType = "practice";
 		const sessionUser = req.session.user;
 		const studentSection = await getStudentSection(sessionUser);
 		if (studentSection) {
@@ -225,6 +226,9 @@ router.get("/topic/:topicId", isAuthenticated, async (req, res) => {
 			if (topicSetting && topicSetting.dueDate) {
 				topicDueDate = topicSetting.dueDate;
 				topicIsPastDue = new Date(topicSetting.dueDate) < new Date();
+			}
+			if (topicSetting) {
+				topicAssignmentType = topicSetting.assignmentType || "practice";
 			}
 		}
 
@@ -272,6 +276,7 @@ router.get("/topic/:topicId", isAuthenticated, async (req, res) => {
 			questions: questionsWithCompletion,
 			topicDueDate,
 			topicIsPastDue,
+			topicAssignmentType,
 		});
 	} catch (error) {
 		console.error("Error fetching questions:", error);

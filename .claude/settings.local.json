@@ -12,7 +12,12 @@
       "mcp__plugin_playwright_playwright__browser_fill_form",
       "mcp__plugin_playwright_playwright__browser_click",
       "mcp__plugin_playwright_playwright__browser_snapshot",
-      "mcp__plugin_playwright_playwright__browser_navigate"
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "Bash(node -c src/routes/topics.js)",
+      "Bash(node -c src/routes/questions.js)",
+      "Bash(node -c src/routes/instructor-course-management.js)",
+      "Bash(node -c src/models/InstructorSectionTopicSetting.js)",
+      "Bash(timeout 8 node -e ' *)"
     ]
   }
 }
