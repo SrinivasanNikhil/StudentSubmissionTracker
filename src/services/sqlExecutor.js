@@ -275,8 +275,11 @@ const isSelectOnly = (query) => {
 		return false;
 	}
 
-	// Reject any destructive keywords anywhere in the statement
-	const forbidden = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|RENAME|GRANT|REVOKE|CALL|EXEC|EXECUTE|LOAD|LOCK|UNLOCK)\b/;
+	// Reject any destructive keywords anywhere in the statement.
+	// OUTFILE/DUMPFILE/LOAD_FILE are included to block server-side file
+	// writes/reads (e.g. `SELECT ... INTO OUTFILE '/path'`), which a bare
+	// SELECT opener would otherwise allow if the DB account has FILE privilege.
+	const forbidden = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|RENAME|GRANT|REVOKE|CALL|EXEC|EXECUTE|LOAD|LOAD_FILE|LOCK|UNLOCK|OUTFILE|DUMPFILE)\b/;
 	return !forbidden.test(normalized);
 };
 

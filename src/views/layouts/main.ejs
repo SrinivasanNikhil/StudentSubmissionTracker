@@ -4,6 +4,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <script>
+        // CSRF interceptor: attaches the session token to same-origin,
+        // state-changing fetch/XHR requests and injects a hidden _csrf field
+        // into non-GET forms. Runs in <head> so it is active before any page
+        // script issues a request. See src/middleware/csrf.js.
+        (function () {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            var token = meta ? meta.getAttribute('content') : '';
+            if (!token) return;
+            var SAFE = { GET: 1, HEAD: 1, OPTIONS: 1 };
+
+            function sameOrigin(url) {
+                try {
+                    return new URL(url, window.location.href).origin === window.location.origin;
+                } catch (e) {
+                    return true; // relative URL -> same origin
+                }
+            }
+
+            if (window.fetch) {
+                var origFetch = window.fetch.bind(window);
+                window.fetch = function (input, init) {
+                    init = init || {};
+                    var url = typeof input === 'string' ? input : (input && input.url) || '';
+                    var method = (init.method || (input && input.method) || 'GET').toUpperCase();
+                    if (!SAFE[method] && sameOrigin(url)) {
+                        var headers = new Headers(init.headers || (input && input.headers) || {});
+                        if (!headers.has('x-csrf-token')) headers.set('x-csrf-token', token);
+                        init.headers = headers;
+                    }
+                    return origFetch(input, init);
+                };
+            }
+
+            if (window.XMLHttpRequest) {
+                var origOpen = XMLHttpRequest.prototype.open;
+                var origSend = XMLHttpRequest.prototype.send;
+                XMLHttpRequest.prototype.open = function (method, url) {
+                    this.__csrfUnsafe = method && !SAFE[method.toUpperCase()] && sameOrigin(url);
+                    return origOpen.apply(this, arguments);
+                };
+                XMLHttpRequest.prototype.send = function () {
+                    if (this.__csrfUnsafe) {
+                        try { this.setRequestHeader('x-csrf-token', token); } catch (e) {}
+                    }
+                    return origSend.apply(this, arguments);
+                };
+            }
+
+            document.addEventListener('submit', function (e) {
+                var form = e.target;
+                if (!form || form.tagName !== 'FORM') return;
+                var method = (form.getAttribute('method') || 'GET').toUpperCase();
+                if (SAFE[method]) return;
+                if (form.querySelector('input[name="_csrf"]')) return;
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = '_csrf';
+                input.value = token;
+                form.appendChild(input);
+            }, true);
+        })();
+    </script>
     <title>
         <%= title %> - Student Submission Tracker
     </title>

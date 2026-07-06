@@ -54,27 +54,12 @@ router.post("/login", isNotAuthenticated, loginLimiter, async (req, res) => {
 			});
 		}
 
-		// Set session with complete user data
-		req.session.userId = user.id;
-		req.session.user = {
-			id: user.id,
-			email: user.email,
-			firstName: user.firstName || "",
-			lastName: user.lastName || "",
-			code: user.code || "",
-			isAdmin: Boolean(user.isAdmin), // Backward compatibility
-			role: user.role || (user.isAdmin ? "admin" : "student"), // New role system
-			instructorCode: user.instructorCode || null,
-			associatedInstructorId: user.associatedInstructorId || null,
-			courseSection: user.courseSection || null,
-			academicYear: user.academicYear || null,
-			semester: user.semester || null,
-		};
-
-		// Save session explicitly before redirecting
-		req.session.save((err) => {
-			if (err) {
-				console.error("Error saving session:", err);
+		// Regenerate the session on login to prevent session fixation: any
+		// session ID established before authentication is discarded and a new
+		// one is issued before we attach the user's identity.
+		req.session.regenerate((regenErr) => {
+			if (regenErr) {
+				console.error("Error regenerating session on login:", regenErr);
 				return res.render("pages/login", {
 					title: "Login",
 					error: "An error occurred during login. Please try again.",
@@ -82,14 +67,43 @@ router.post("/login", isNotAuthenticated, loginLimiter, async (req, res) => {
 				});
 			}
 
-			// Redirect based on role
-			if (user.role === "admin" || user.isAdmin) {
-				return res.redirect("/admin");
-			} else if (user.role === "instructor") {
-				return res.redirect("/instructor/dashboard");
-			} else {
-				return res.redirect("/topics");
-			}
+			// Set session with complete user data
+			req.session.userId = user.id;
+			req.session.user = {
+				id: user.id,
+				email: user.email,
+				firstName: user.firstName || "",
+				lastName: user.lastName || "",
+				code: user.code || "",
+				isAdmin: Boolean(user.isAdmin), // Backward compatibility
+				role: user.role || (user.isAdmin ? "admin" : "student"), // New role system
+				instructorCode: user.instructorCode || null,
+				associatedInstructorId: user.associatedInstructorId || null,
+				courseSection: user.courseSection || null,
+				academicYear: user.academicYear || null,
+				semester: user.semester || null,
+			};
+
+			// Save session explicitly before redirecting
+			req.session.save((err) => {
+				if (err) {
+					console.error("Error saving session:", err);
+					return res.render("pages/login", {
+						title: "Login",
+						error: "An error occurred during login. Please try again.",
+						email: req.body.email,
+					});
+				}
+
+				// Redirect based on role
+				if (user.role === "admin" || user.isAdmin) {
+					return res.redirect("/admin");
+				} else if (user.role === "instructor") {
+					return res.redirect("/instructor/dashboard");
+				} else {
+					return res.redirect("/topics");
+				}
+			});
 		});
 	} catch (error) {
 		console.error("Login error:", error);
@@ -261,27 +275,14 @@ router.post("/register", isNotAuthenticated, registerLimiter, async (req, res) =
 			courseSection: validatedCourseSection,
 		});
 
-		// Set session (automatic login after registration)
-		req.session.userId = newUser.id;
-		req.session.user = {
-			id: newUser.id,
-			email: newUser.email,
-			firstName: newUser.firstName || "",
-			lastName: newUser.lastName || "",
-			code: newUser.code || "",
-			isAdmin: newUser.isAdmin || false,
-			role: newUser.role || "student",
-			instructorCode: newUser.instructorCode || null,
-			associatedInstructorId: newUser.associatedInstructorId || null,
-			courseSection: newUser.courseSection || null,
-			academicYear: newUser.academicYear || null,
-			semester: newUser.semester || null,
-		};
-
-		// Persist session before redirecting (same pattern as login)
-		req.session.save((err) => {
-			if (err) {
-				console.error("Error saving session after registration:", err);
+		// Regenerate the session before logging the new user in (prevents
+		// session fixation, same pattern as login).
+		req.session.regenerate((regenErr) => {
+			if (regenErr) {
+				console.error(
+					"Error regenerating session after registration:",
+					regenErr
+				);
 				return res.render("pages/register", {
 					title: "Register",
 					error: "An error occurred during registration. Please try again.",
@@ -291,7 +292,39 @@ router.post("/register", isNotAuthenticated, registerLimiter, async (req, res) =
 					instructorCode: req.body.instructorCode,
 				});
 			}
-			res.redirect("/topics");
+
+			// Set session (automatic login after registration)
+			req.session.userId = newUser.id;
+			req.session.user = {
+				id: newUser.id,
+				email: newUser.email,
+				firstName: newUser.firstName || "",
+				lastName: newUser.lastName || "",
+				code: newUser.code || "",
+				isAdmin: newUser.isAdmin || false,
+				role: newUser.role || "student",
+				instructorCode: newUser.instructorCode || null,
+				associatedInstructorId: newUser.associatedInstructorId || null,
+				courseSection: newUser.courseSection || null,
+				academicYear: newUser.academicYear || null,
+				semester: newUser.semester || null,
+			};
+
+			// Persist session before redirecting (same pattern as login)
+			req.session.save((err) => {
+				if (err) {
+					console.error("Error saving session after registration:", err);
+					return res.render("pages/register", {
+						title: "Register",
+						error: "An error occurred during registration. Please try again.",
+						email: req.body.email,
+						firstName: req.body.firstName,
+						lastName: req.body.lastName,
+						instructorCode: req.body.instructorCode,
+					});
+				}
+				res.redirect("/topics");
+			});
 		});
 	} catch (error) {
 		console.error("Registration error:", error);

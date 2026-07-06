@@ -513,36 +513,77 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                         resultsTbody.innerHTML = '<tr><td class="text-center">No results returned</td></tr>';
                     }
                 } else {
-                    // Query execution failed - display detailed error information
+                    // Query execution failed - display detailed error information.
+                    // Database error strings can contain the student's own query
+                    // text, so build the DOM with textContent (never innerHTML
+                    // string interpolation) to avoid HTML/script injection.
                     executionStatus.className = 'alert alert-danger';
-                    let errorMessage = `<div class="error-details">`;
+                    executionStatus.innerHTML = '';
 
-                    // Add the main error message in a more prominent way
-                    errorMessage += `<div class="mb-2"><strong>Database Error:</strong> ${execResult.message}</div>`;
+                    const details = document.createElement('div');
+                    details.className = 'error-details';
 
-                    // Add the full error string if available (this contains the actual database error)
+                    // Main error message
+                    const mainMsg = document.createElement('div');
+                    mainMsg.className = 'mb-2';
+                    const mainLabel = document.createElement('strong');
+                    mainLabel.textContent = 'Database Error: ';
+                    mainMsg.appendChild(mainLabel);
+                    mainMsg.appendChild(document.createTextNode(execResult.message || 'Unknown error'));
+                    details.appendChild(mainMsg);
+
+                    // Full error string (the actual database error)
                     if (execResult.error) {
-                        errorMessage += `<div class="mt-2"><strong>Technical Details:</strong><br><code>${execResult.error}</code></div>`;
+                        const techWrap = document.createElement('div');
+                        techWrap.className = 'mt-2';
+                        const techLabel = document.createElement('strong');
+                        techLabel.textContent = 'Technical Details:';
+                        techWrap.appendChild(techLabel);
+                        techWrap.appendChild(document.createElement('br'));
+                        const code = document.createElement('code');
+                        code.textContent = execResult.error;
+                        techWrap.appendChild(code);
+                        details.appendChild(techWrap);
                     }
 
-                    // Add additional error details in a collapsible section
+                    // Additional error details in a collapsible section
                     if (execResult.errorCode || execResult.errorState || execResult.errorNumber) {
-                        errorMessage += `<div class="mt-2">
-                            <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#errorDetails">
-                                Show Additional Error Details
-                            </button>
-                            <div class="collapse mt-2" id="errorDetails">
-                                <div class="card card-body bg-light">
-                                    ${execResult.errorCode ? `<div><strong>Error Code:</strong> ${execResult.errorCode}</div>` : ''}
-                                    ${execResult.errorState ? `<div><strong>SQL State:</strong> ${execResult.errorState}</div>` : ''}
-                                    ${execResult.errorNumber ? `<div><strong>Error Number:</strong> ${execResult.errorNumber}</div>` : ''}
-                                </div>
-                            </div>
-                        </div>`;
+                        const wrap = document.createElement('div');
+                        wrap.className = 'mt-2';
+
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-sm btn-outline-danger';
+                        btn.type = 'button';
+                        btn.setAttribute('data-bs-toggle', 'collapse');
+                        btn.setAttribute('data-bs-target', '#errorDetails');
+                        btn.textContent = 'Show Additional Error Details';
+                        wrap.appendChild(btn);
+
+                        const collapse = document.createElement('div');
+                        collapse.className = 'collapse mt-2';
+                        collapse.id = 'errorDetails';
+                        const card = document.createElement('div');
+                        card.className = 'card card-body bg-light';
+
+                        const addRow = (label, value) => {
+                            if (value === null || value === undefined || value === '') return;
+                            const row = document.createElement('div');
+                            const strong = document.createElement('strong');
+                            strong.textContent = label + ' ';
+                            row.appendChild(strong);
+                            row.appendChild(document.createTextNode(String(value)));
+                            card.appendChild(row);
+                        };
+                        addRow('Error Code:', execResult.errorCode);
+                        addRow('SQL State:', execResult.errorState);
+                        addRow('Error Number:', execResult.errorNumber);
+
+                        collapse.appendChild(card);
+                        wrap.appendChild(collapse);
+                        details.appendChild(wrap);
                     }
 
-                    errorMessage += `</div>`;
-                    executionStatus.innerHTML = errorMessage;
+                    executionStatus.appendChild(details);
                 }
 
                 // Handle comparison results if available

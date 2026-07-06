@@ -18,6 +18,19 @@ const SequelizeStore = require("connect-session-sequelize")(session.Store);
 // Load environment variables
 dotenv.config();
 
+// Fail fast if the session secret is missing or left at the insecure default.
+// A hard-coded fallback would let anyone forge signed session cookies.
+if (
+	!process.env.SESSION_SECRET ||
+	process.env.SESSION_SECRET === "fallback_session_secret"
+) {
+	console.error(
+		"FATAL: SESSION_SECRET is not set (or is still the insecure default). " +
+			"Set a long, random SESSION_SECRET in the environment before starting."
+	);
+	process.exit(1);
+}
+
 // Create Express app
 const app = express();
 
@@ -62,7 +75,7 @@ if (
 // Session configuration
 app.use(
 	session({
-		secret: process.env.SESSION_SECRET || "fallback_session_secret",
+		secret: process.env.SESSION_SECRET,
 		store: sessionStore,
 		resave: true, // Changed to true to ensure session is saved
 		saveUninitialized: true, // Changed to true to save new sessions
@@ -106,6 +119,12 @@ app.use((req, res, next) => {
 		next(error);
 	}
 });
+
+// CSRF protection: attach a per-session token to every response, then verify it
+// on state-changing requests. Must run after the session and body parsers.
+const { attachCsrfToken, verifyCsrf } = require("./middleware/csrf");
+app.use(attachCsrfToken);
+app.use(verifyCsrf);
 
 // Import routes
 const authRoutes = require("./routes/auth");

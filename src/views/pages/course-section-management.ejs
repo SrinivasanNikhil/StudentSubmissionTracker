@@ -82,6 +82,7 @@
                                         <% } else { %>
                                             <!-- Update Form -->
                                             <form action="/profile/course-section/update" method="POST">
+                                                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
                                                 <h5>Update Course Section Information</h5>
 
                                                 <div class="row mb-3">
