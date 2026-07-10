@@ -79,7 +79,7 @@
                                            class="form-control form-control-sm topic-due-date"
                                            id="duedate-<%= topic.id %>"
                                            data-topic-id="<%= topic.id %>"
-                                           value="<%= topic.dueDate ? (d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`)(new Date(topic.dueDate)) : '' %>">
+                                           value="<%= topic.dueDateInput || '' %>">
                                 </td>
                                 <td>
                                     <input type="number"
