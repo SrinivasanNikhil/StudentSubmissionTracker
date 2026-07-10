@@ -4,7 +4,7 @@
         <div class="alert <%= topicIsPastDue ? 'alert-danger' : 'alert-warning' %> mb-4">
             <i class="bi bi-calendar me-2"></i>
             <strong>Deadline:</strong>
-            <%= new Date(topicDueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+            <%= new Date(topicDueDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' }) %>
             <% if (topicIsPastDue) { %>
                 &mdash; <strong>This topic is closed. Completions are no longer recorded.</strong>
             <% } %>

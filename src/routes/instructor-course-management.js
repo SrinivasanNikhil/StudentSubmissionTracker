@@ -13,6 +13,10 @@ const {
 } = require("../models");
 const { isAuthenticated, isInstructor } = require("../middleware/auth");
 const { Op, fn, col } = require("sequelize");
+const {
+	parseDatetimeLocalToUtc,
+	utcToDatetimeLocal,
+} = require("../utils/timezone");
 const createCsvStringifier = require("csv-writer").createObjectCsvStringifier;
 
 // Course section management dashboard
@@ -309,10 +313,14 @@ router.get(
 
 			const topicsWithSettings = topics.map((t) => {
 				const setting = settingsMap.get(t.id);
+				const dueDate = setting ? setting.dueDate : null;
 				return {
 					...t.toJSON(),
 					isVisible: setting ? setting.isVisible : true,
-					dueDate: setting ? setting.dueDate : null,
+					dueDate,
+					// Precompute the datetime-local value in the course timezone so
+					// the input repopulates in Eastern rather than the server's zone.
+					dueDateInput: dueDate ? utcToDatetimeLocal(dueDate) : "",
 					gracePeriodMinutes: setting ? setting.gracePeriodMinutes : 0,
 					assignmentType: setting ? setting.assignmentType : "practice",
 				};
@@ -356,11 +364,16 @@ router.post(
 
 			const { topicId, isVisible, dueDate, gracePeriodMinutes, assignmentType } = req.body;
 
+			// The datetime-local value is a naive wall clock meant in the course
+			// timezone; convert it to a true UTC instant before storing so it is
+			// compared/enforced correctly regardless of the server's timezone.
+			const parsedDue = dueDate ? parseDatetimeLocalToUtc(dueDate) : null;
+
 			await InstructorSectionTopicSetting.upsert({
 				instructorCourseSectionId: parseInt(id),
 				topicId: parseInt(topicId),
 				isVisible: Boolean(isVisible),
-				dueDate: dueDate || null,
+				dueDate: parsedDue,
 				gracePeriodMinutes: parseInt(gracePeriodMinutes, 10) || 0,
 				assignmentType: assignmentType === "assignment" ? "assignment" : "practice",
 			});
