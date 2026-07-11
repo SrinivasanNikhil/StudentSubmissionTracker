@@ -14,6 +14,7 @@ const createCsvStringifier = require("csv-writer").createObjectCsvStringifier;
 const bcrypt = require("bcryptjs");
 const {
 	buildStudentScopeFilter,
+	buildCompletionTermFilter,
 	getFilterOptions,
 } = require("../utils/exportHelpers");
 const { runMatrixExport, runTopicSummaryExport, runDetailedAttemptsExport } = require("../utils/exportRunners");
@@ -528,6 +529,7 @@ router.get("/export/run", isAuthenticated, isAdmin, async (req, res) => {
 		if (req.query.code && req.query.code !== "all") {
 			studentWhere.code = req.query.code;
 		}
+		const termFilter = buildCompletionTermFilter(req.query);
 
 		let result;
 		if (type === "matrix") {
@@ -536,6 +538,7 @@ router.get("/export/run", isAuthenticated, isAdmin, async (req, res) => {
 				topicId: req.query.topicId,
 				summaryOnly: req.query.summaryOnly === "true",
 				createCsvStringifier,
+				termFilter,
 			});
 		} else if (type === "detailed-attempts") {
 			let topicIds = req.query.detailedAttemptsTopicIds;
@@ -547,7 +550,7 @@ router.get("/export/run", isAuthenticated, isAdmin, async (req, res) => {
 			if (topicIds.length === 0) {
 				return res.redirect("/admin/export?type=detailed-attempts");
 			}
-			result = await runDetailedAttemptsExport({ studentWhere, topicIds });
+			result = await runDetailedAttemptsExport({ studentWhere, topicIds, termFilter });
 		} else {
 			// default / topic-summary
 			let topicIds = req.query.topicSummaryTopicIds;
@@ -559,7 +562,7 @@ router.get("/export/run", isAuthenticated, isAdmin, async (req, res) => {
 			if (topicIds.length === 0) {
 				return res.redirect("/admin/export?type=topic-summary");
 			}
-			result = await runTopicSummaryExport({ studentWhere, topicIds });
+			result = await runTopicSummaryExport({ studentWhere, topicIds, termFilter });
 		}
 
 		if (result.notFound) {

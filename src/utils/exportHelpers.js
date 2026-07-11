@@ -22,6 +22,26 @@ function buildStudentScopeFilter(role, instructorId, query) {
 	return where;
 }
 
+// Completion-level term filter, mirroring buildStudentScopeFilter's
+// "all means no filter" semantics. Completions carry their own
+// academicYear/semester stamps (unique per user+question+term), so exports
+// must scope the COMPLETION rows to the selected term as well — otherwise a
+// retaking student's prior-term completions would be credited to the term
+// being exported.
+function buildCompletionTermFilter(query) {
+	const { academicYear, semester } = query;
+	const where = {};
+
+	if (academicYear && academicYear !== "all") {
+		where.academicYear = academicYear;
+	}
+	if (semester && semester !== "all") {
+		where.semester = semester;
+	}
+
+	return where;
+}
+
 async function getFilterOptions(role, instructorId) {
 	const academicYearsSet = new Set();
 	const semestersSet = new Set();
@@ -79,4 +99,9 @@ function formatStudentName(user) {
 	return `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Not provided";
 }
 
-module.exports = { buildStudentScopeFilter, getFilterOptions, formatStudentName };
+module.exports = {
+	buildStudentScopeFilter,
+	buildCompletionTermFilter,
+	getFilterOptions,
+	formatStudentName,
+};

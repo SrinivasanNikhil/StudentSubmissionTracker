@@ -16,6 +16,25 @@ async function getStudentSection(user) {
 	});
 }
 
+// Helper: extra Completion where-clause scoping reads to the student's current
+// term. Applies only to students with both term fields set (matching the
+// /topics progress-ring semantics in src/routes/topics.js); everyone else sees
+// unfiltered completions (legacy students without term data, admins).
+function termCompletionFilter(sessionUser) {
+	if (
+		sessionUser &&
+		sessionUser.role === "student" &&
+		sessionUser.academicYear &&
+		sessionUser.semester
+	) {
+		return {
+			academicYear: sessionUser.academicYear,
+			semester: sessionUser.semester,
+		};
+	}
+	return {};
+}
+
 // Helper: compute due-date status, accounting for an optional grace period
 function getDeadlineStatus(dueDate, gracePeriodMinutes) {
 	if (!dueDate) return { isPastDue: false, isPastGrace: false };
@@ -248,9 +267,11 @@ router.get("/topic/:topicId", isAuthenticated, async (req, res) => {
 		});
 
 		// Get completions for the current user to mark completed questions
+		// (scoped to the student's current term so retakers see fresh progress)
 		const completions = await Completion.findAll({
 			where: {
 				userId: req.session.userId,
+				...termCompletionFilter(req.session.user),
 			},
 			attributes: ["questionId"],
 		});
@@ -314,11 +335,12 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 			});
 		}
 
-		// Check if the user has completed this question
+		// Check if the user has completed this question in their current term
 		const completion = await Completion.findOne({
 			where: {
 				userId: req.session.userId,
 				questionId: id,
+				...termCompletionFilter(req.session.user),
 			},
 		});
 
@@ -466,28 +488,36 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 				isCompleted = true;
 
 				if (!pastGrace) {
-					// Check if the user has already completed this question
+					// Get user's semester information and compute the effective term
+					// ONCE, so the existence check and the insert can never disagree.
+					const user = await User.findByPk(userId);
+					const effectiveYear =
+						user.academicYear ||
+						InstructorCourseSection.getCurrentAcademicYear();
+					const effectiveSemester =
+						user.semester || InstructorCourseSection.getCurrentSemester();
+
+					// Check if the user has already completed this question THIS TERM.
+					// Completions are unique per (user, question, academicYear, semester)
+					// so a student retaking the course earns fresh completions while
+					// prior-term rows are preserved.
 					const existingCompletion = await Completion.findOne({
 						where: {
 							userId,
 							questionId: id,
+							academicYear: effectiveYear,
+							semester: effectiveSemester,
 						},
 					});
 
-					// If not already completed, mark it as completed
+					// If not already completed this term, mark it as completed
 					if (!existingCompletion) {
-						// Get user's semester information
-						const user = await User.findByPk(userId);
-
 						await Completion.create({
 							userId,
 							questionId: id,
 							completedAt: new Date(),
-							academicYear:
-								user.academicYear ||
-								InstructorCourseSection.getCurrentAcademicYear(),
-							semester:
-								user.semester || InstructorCourseSection.getCurrentSemester(),
+							academicYear: effectiveYear,
+							semester: effectiveSemester,
 							courseSection: user.courseSection,
 						});
 
@@ -1026,16 +1056,31 @@ IMPORTANT: Your response must be a valid JSON object. Do not include any text be
 
 		// Store the evaluation in the database
 		try {
+			// Completions are unique per (user, question, academicYear, semester);
+			// scope the lookup to the student's effective term so a retaker gets a
+			// fresh record instead of overwriting a prior term's evaluation.
+			const modelUser = await User.findByPk(req.session.userId);
+			const effectiveYear =
+				modelUser.academicYear ||
+				InstructorCourseSection.getCurrentAcademicYear();
+			const effectiveSemester =
+				modelUser.semester || InstructorCourseSection.getCurrentSemester();
+
 			const [completionRecord, created] = await Completion.findOrCreate({
 				where: {
 					userId: req.session.userId,
 					questionId: id,
+					academicYear: effectiveYear,
+					semester: effectiveSemester,
 				},
 				defaults: {
 					userId: req.session.userId,
 					questionId: id,
 					completedAt: new Date(),
 					evaluation: JSON.stringify(response),
+					academicYear: effectiveYear,
+					semester: effectiveSemester,
+					courseSection: modelUser.courseSection,
 				},
 			});
 
@@ -1071,11 +1116,12 @@ router.get("/:id/completion", isAuthenticated, async (req, res) => {
 		const { id } = req.params;
 		const userId = req.session.userId;
 
-		// Find the completion record
+		// Find the completion record (current term's record for students)
 		const completion = await Completion.findOne({
 			where: {
 				userId: userId,
 				questionId: id,
+				...termCompletionFilter(req.session.user),
 			},
 		});
 

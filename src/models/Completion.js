@@ -119,9 +119,12 @@ module.exports = (sequelize) => {
 			underscored: true,
 			indexes: [
 				{
+					// One completion per user+question PER TERM — lets a student who
+					// retakes the course earn completions again in the new term while
+					// prior-term rows are preserved for reporting/research.
 					unique: true,
-					fields: ["userId", "questionId"],
-					name: "unique_user_question_completion",
+					fields: ["userId", "questionId", "academicYear", "semester"],
+					name: "unique_user_question_term_completion",
 				},
 			],
 		}

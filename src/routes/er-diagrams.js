@@ -3,7 +3,13 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs").promises;
-const { Completion, Question, User, Topic } = require("../models");
+const {
+	Completion,
+	Question,
+	User,
+	Topic,
+	InstructorCourseSection,
+} = require("../models");
 const {
 	isAuthenticated,
 	isAdmin,
@@ -138,11 +144,23 @@ router.post(
 
 			uploadedFile = req.file;
 
-			// Check for existing submission
+			// Completions are unique per (user, question, academicYear, semester);
+			// scope the duplicate check to the student's effective term so a
+			// retaking student can submit again in a new term.
+			const submitUser = await User.findByPk(userId);
+			const effectiveYear =
+				submitUser.academicYear ||
+				InstructorCourseSection.getCurrentAcademicYear();
+			const effectiveSemester =
+				submitUser.semester || InstructorCourseSection.getCurrentSemester();
+
+			// Check for existing submission this term
 			const existingSubmission = await Completion.findOne({
 				where: {
 					userId,
 					questionId,
+					academicYear: effectiveYear,
+					semester: effectiveSemester,
 				},
 			});
 
@@ -163,6 +181,9 @@ router.post(
 				enhancements,
 				aiReflection,
 				status: "pending",
+				academicYear: effectiveYear,
+				semester: effectiveSemester,
+				courseSection: submitUser.courseSection,
 			});
 
 			res.json({

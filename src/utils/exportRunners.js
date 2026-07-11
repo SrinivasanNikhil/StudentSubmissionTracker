@@ -10,7 +10,7 @@ function csvHeaders(headers) {
 	return headers;
 }
 
-async function runMatrixExport({ studentWhere, topicId, summaryOnly, res, createCsvStringifier }) {
+async function runMatrixExport({ studentWhere, topicId, summaryOnly, res, createCsvStringifier, termFilter = {} }) {
 	const students = await User.findAll({
 		where: studentWhere,
 		attributes: ["id", "email", "firstName", "lastName", "code", "courseSection"],
@@ -24,7 +24,7 @@ async function runMatrixExport({ studentWhere, topicId, summaryOnly, res, create
 	const studentIds = students.map((student) => student.id);
 
 	const completions = await Completion.findAll({
-		where: { userId: { [Op.in]: studentIds } },
+		where: { userId: { [Op.in]: studentIds }, ...termFilter },
 		attributes: ["userId", "questionId"],
 	});
 
@@ -100,7 +100,7 @@ async function runMatrixExport({ studentWhere, topicId, summaryOnly, res, create
 	return { headers, csvData, filenamePrefix: "completions-matrix" };
 }
 
-async function runTopicSummaryExport({ studentWhere, topicIds }) {
+async function runTopicSummaryExport({ studentWhere, topicIds, termFilter = {} }) {
 	const students = await User.findAll({
 		where: studentWhere,
 		attributes: ["id", "email", "firstName", "lastName", "code"],
@@ -125,7 +125,7 @@ async function runTopicSummaryExport({ studentWhere, topicIds }) {
 	const studentIds = students.map((student) => student.id);
 
 	const completions = await Completion.findAll({
-		where: { userId: { [Op.in]: studentIds } },
+		where: { userId: { [Op.in]: studentIds }, ...termFilter },
 		include: [
 			{
 				model: Question,
@@ -190,7 +190,7 @@ async function runTopicSummaryExport({ studentWhere, topicIds }) {
 	return { headers, csvData, filenamePrefix: "topic-completion-summary" };
 }
 
-async function runDetailedAttemptsExport({ studentWhere, topicIds }) {
+async function runDetailedAttemptsExport({ studentWhere, topicIds, termFilter = {} }) {
 	const students = await User.findAll({
 		where: studentWhere,
 		attributes: ["id", "email", "firstName", "lastName", "code", "courseSection"],
@@ -221,6 +221,7 @@ async function runDetailedAttemptsExport({ studentWhere, topicIds }) {
 		where: {
 			userId: { [Op.in]: studentIds },
 			questionId: { [Op.in]: questionIds },
+			...termFilter,
 		},
 		attributes: [
 			"userId",
@@ -237,11 +238,17 @@ async function runDetailedAttemptsExport({ studentWhere, topicIds }) {
 		completionMap.set(`${completion.userId}_${completion.questionId}`, completion);
 	});
 
+	// Scope attempts to the same term as completions. Caveat: InteractionLog
+	// rows are stamped with the student's profile term AT THE TIME of the
+	// attempt, so a retaker's attempts made before switching their profile to
+	// the new term carry the old term and may be undercounted here. Completions
+	// (the graded signal) are unaffected.
 	const attempts = await InteractionLog.findAll({
 		where: {
 			userId: { [Op.in]: studentIds },
 			questionId: { [Op.in]: questionIds },
 			eventType: "query_attempt",
+			...termFilter,
 		},
 		attributes: ["userId", "questionId", "eventData", "occurredAt"],
 		order: [["occurredAt", "DESC"]],
