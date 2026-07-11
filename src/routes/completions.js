@@ -8,9 +8,24 @@ router.get("/user/progress", isAuthenticated, async (req, res) => {
 	try {
 		const userId = req.session.userId;
 
-		// Get all of the user's completions with question and topic info
+		// Scope to the student's current term (matches the /topics progress-ring
+		// semantics) so a retaking student sees this term's progress, not a prior
+		// term's. Non-students / students without term data see everything.
+		const sessionUser = req.session.user;
+		const termFilter =
+			sessionUser &&
+			sessionUser.role === "student" &&
+			sessionUser.academicYear &&
+			sessionUser.semester
+				? {
+						academicYear: sessionUser.academicYear,
+						semester: sessionUser.semester,
+					}
+				: {};
+
+		// Get the user's completions with question and topic info
 		const completions = await Completion.findAll({
-			where: { userId },
+			where: { userId, ...termFilter },
 			include: [
 				{
 					model: Question,

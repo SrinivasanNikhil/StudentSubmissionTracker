@@ -17,6 +17,7 @@ const { Op } = require("sequelize");
 const createCsvStringifier = require("csv-writer").createObjectCsvStringifier;
 const {
 	buildStudentScopeFilter,
+	buildCompletionTermFilter,
 	getFilterOptions,
 	formatStudentName,
 } = require("../utils/exportHelpers");
@@ -38,13 +39,21 @@ router.get("/dashboard", isAuthenticated, isInstructor, async (req, res) => {
 				associatedInstructorId: instructorId,
 				role: "student",
 			},
-			attributes: ["id", "email", "firstName", "lastName", "createdAt"],
+			attributes: [
+				"id",
+				"email",
+				"firstName",
+				"lastName",
+				"createdAt",
+				"academicYear",
+				"semester",
+			],
 			order: [["createdAt", "DESC"]],
 		});
 
 		// Get completion statistics for instructor's students
 		const studentIds = students.map((student) => student.id);
-		const completions = await Completion.findAll({
+		const allCompletions = await Completion.findAll({
 			where: {
 				userId: {
 					[Op.in]: studentIds,
@@ -57,6 +66,20 @@ router.get("/dashboard", isAuthenticated, isInstructor, async (req, res) => {
 					include: [{ model: Topic, as: "topic" }],
 				},
 			],
+		});
+
+		// Completions are per-term (unique on user+question+year+semester); a
+		// retaking student keeps prior-term rows. Count only rows matching each
+		// student's OWN current term (same semantics as the /topics progress
+		// ring). Students without term data keep the legacy count-everything
+		// behavior.
+		const studentTermMap = new Map(
+			students.map((s) => [s.id, s.academicYear && s.semester ? `${s.academicYear}|${s.semester}` : null])
+		);
+		const completions = allCompletions.filter((c) => {
+			const term = studentTermMap.get(c.userId);
+			if (!term) return true;
+			return `${c.academicYear}|${c.semester}` === term;
 		});
 
 		// Calculate statistics
@@ -78,14 +101,12 @@ router.get("/dashboard", isAuthenticated, isInstructor, async (req, res) => {
 			? Math.round((uniqueStudentsWithCompletions / totalStudents) * 100)
 			: 0;
 
-		// Per-student completion counts for the recent students table
-		const completionCountRows = await Completion.findAll({
-			where: { userId: { [Op.in]: studentIds } },
-			attributes: ["userId", [require("sequelize").fn("COUNT", require("sequelize").col("id")), "count"]],
-			group: ["userId"],
-			raw: true,
+		// Per-student completion counts for the recent students table — derived
+		// from the same term-matched completions as the stats above.
+		const completionMap = {};
+		completions.forEach((c) => {
+			completionMap[c.userId] = (completionMap[c.userId] || 0) + 1;
 		});
-		const completionMap = Object.fromEntries(completionCountRows.map((r) => [r.userId, Number(r.count)]));
 		const studentsWithCounts = students.map((s) => ({
 			...s.toJSON(),
 			completionCount: completionMap[s.id] || 0,
@@ -367,6 +388,7 @@ router.get("/export/run", isAuthenticated, isInstructor, async (req, res) => {
 		}
 
 		const studentWhere = buildStudentScopeFilter("instructor", instructorId, req.query);
+		const termFilter = buildCompletionTermFilter(req.query);
 
 		let result;
 		if (type === "matrix") {
@@ -375,6 +397,7 @@ router.get("/export/run", isAuthenticated, isInstructor, async (req, res) => {
 				topicId: req.query.topicId,
 				summaryOnly: req.query.summaryOnly === "true",
 				createCsvStringifier,
+				termFilter,
 			});
 		} else if (type === "detailed-attempts") {
 			let topicIds = req.query.detailedAttemptsTopicIds;
@@ -386,7 +409,7 @@ router.get("/export/run", isAuthenticated, isInstructor, async (req, res) => {
 			if (topicIds.length === 0) {
 				return res.redirect("/instructor/export?type=detailed-attempts");
 			}
-			result = await runDetailedAttemptsExport({ studentWhere, topicIds });
+			result = await runDetailedAttemptsExport({ studentWhere, topicIds, termFilter });
 		} else {
 			// default / topic-summary
 			let topicIds = req.query.topicSummaryTopicIds;
@@ -398,7 +421,7 @@ router.get("/export/run", isAuthenticated, isInstructor, async (req, res) => {
 			if (topicIds.length === 0) {
 				return res.redirect("/instructor/export?type=topic-summary");
 			}
-			result = await runTopicSummaryExport({ studentWhere, topicIds });
+			result = await runTopicSummaryExport({ studentWhere, topicIds, termFilter });
 		}
 
 		if (result.notFound) {
