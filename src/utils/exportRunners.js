@@ -290,12 +290,21 @@ async function runDetailedAttemptsExport({ studentWhere, topicIds, termFilter = 
 			let bestMatchPercent = "";
 			if (question.topic.type !== "data_model") {
 				const ratioWindow = pairAttempts.slice(0, ATTEMPT_RATIO_WINDOW);
+				// Symmetric row closeness in [0,1], matching the solution-unlock
+				// gate's rowProximityScore in src/routes/questions.js — a broad
+				// SELECT * returning far more rows than the solution scores low,
+				// not >100%.
 				const bestRatio = ratioWindow.reduce((best, attempt) => {
 					const data = attempt.eventData || {};
-					if (data.solutionRows > 0) {
-						return Math.max(best, (data.studentRows || 0) / data.solutionRows);
+					const solutionRows = data.solutionRows;
+					const studentRows = data.studentRows || 0;
+					let score;
+					if (!solutionRows || solutionRows <= 0) {
+						score = studentRows <= 0 ? 1 : 0;
+					} else {
+						score = Math.min(studentRows, solutionRows) / Math.max(studentRows, solutionRows);
 					}
-					return best;
+					return Math.max(best, score);
 				}, 0);
 				if (ratioWindow.length > 0) {
 					bestMatchPercent = Math.round(bestRatio * 100);
