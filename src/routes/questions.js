@@ -44,10 +44,51 @@ function getDeadlineStatus(dueDate, gracePeriodMinutes) {
 	return { isPastDue: due < now, isPastGrace: graceCutoff < now };
 }
 
-// Helper: compute solution unlock status for a user+question
+// Solution-unlock gate tuning (kept together so they can be adjusted in one
+// place after watching real unlock rates).
+const UNLOCK_MIN_ATTEMPTS = 5; // volume floor for the proximity path
+const UNLOCK_ROW_PROXIMITY = 0.75; // bounded row closeness required (0..1)
+const UNLOCK_EFFORT_DISTINCT = 10; // distinct serious queries for the fallback
+const UNLOCK_ATTEMPT_WINDOW = 50; // most-recent attempts considered
+
+// True for a bare "SELECT * ..." query. Such queries return every column, so
+// they can't legitimately demonstrate proximity to a targeted solution, and
+// they don't count toward the effort fallback.
+function isSelectStar(query) {
+	return /^\s*select\s+\*/i.test(query || "");
+}
+
+// Symmetric row closeness in [0,1]: penalizes returning TOO MANY rows exactly as
+// much as too few, so a broad SELECT * on a large table scores near zero.
+function rowProximityScore(studentRows, solutionRows) {
+	if (!solutionRows || solutionRows <= 0) {
+		return !studentRows || studentRows <= 0 ? 1 : 0;
+	}
+	const s = studentRows || 0;
+	return Math.min(s, solutionRows) / Math.max(s, solutionRows);
+}
+
+// Helper: compute solution unlock status for a user+question.
+//
+// Two independent paths unlock the solution:
+//  - Proximity: >= UNLOCK_MIN_ATTEMPTS attempts AND some attempt got the right
+//    COLUMN COUNT and landed within UNLOCK_ROW_PROXIMITY of the expected rows.
+//  - Effort fallback: >= UNLOCK_EFFORT_DISTINCT distinct, successfully-executed,
+//    non-SELECT* queries (prevents permanent lockout without being gameable —
+//    repeating one query counts once; bare star queries count zero).
 async function getSolutionUnlockStatus(userId, questionId) {
 	const existingCompletion = await Completion.findOne({ where: { userId, questionId } });
-	if (existingCompletion) return { solutionUnlocked: true, attemptCount: 0, bestRatio: 1, existingCompletion };
+	if (existingCompletion) {
+		return {
+			solutionUnlocked: true,
+			attemptCount: 0,
+			bestProximityPct: 100,
+			bestRowScorePct: 100,
+			anyColumnsCorrect: true,
+			distinctSeriousAttempts: 0,
+			existingCompletion,
+		};
+	}
 
 	const attemptCount = await InteractionLog.count({
 		where: { userId, questionId, eventType: "query_attempt" },
@@ -56,19 +97,50 @@ async function getSolutionUnlockStatus(userId, questionId) {
 	const recentAttempts = await InteractionLog.findAll({
 		where: { userId, questionId, eventType: "query_attempt" },
 		order: [["occurred_at", "DESC"]],
-		limit: 50,
+		limit: UNLOCK_ATTEMPT_WINDOW,
 	});
 
-	const bestRatio = recentAttempts.reduce((best, log) => {
-		const data = log.eventData || {};
-		if (data.solutionRows > 0) {
-			return Math.max(best, (data.studentRows || 0) / data.solutionRows);
-		}
-		return best;
-	}, 0);
+	let bestProximity = 0;
+	let bestRowScore = 0;
+	let anyColumnsCorrect = false;
+	const seriousHashes = new Set();
 
-	const solutionUnlocked = attemptCount >= 5 && bestRatio >= 0.75;
-	return { solutionUnlocked, attemptCount, bestRatio, existingCompletion: null };
+	for (const log of recentAttempts) {
+		const data = log.eventData || {};
+		const rowScore = rowProximityScore(data.studentRows, data.solutionRows);
+		const columnsMatch = data.columnsMatch === true;
+		if (columnsMatch) anyColumnsCorrect = true;
+		bestRowScore = Math.max(bestRowScore, rowScore);
+		bestProximity = Math.max(bestProximity, columnsMatch ? rowScore : 0);
+
+		// Distinct-serious count for the effort fallback: executed, non-star,
+		// deduped by normalized query text. Legacy rows lack `executed`/`queryHash`
+		// — infer "executed" when the attempt returned rows or matched columns.
+		const queryText = data.queryText || "";
+		if (isSelectStar(queryText)) continue;
+		const executed =
+			data.executed === true ||
+			(data.executed === undefined &&
+				((data.studentRows || 0) > 0 || columnsMatch));
+		if (!executed) continue;
+		seriousHashes.add(data.queryHash || hashQuery(queryText));
+	}
+
+	const distinctSeriousAttempts = seriousHashes.size;
+
+	const proximityPath =
+		attemptCount >= UNLOCK_MIN_ATTEMPTS && bestProximity >= UNLOCK_ROW_PROXIMITY;
+	const effortPath = distinctSeriousAttempts >= UNLOCK_EFFORT_DISTINCT;
+
+	return {
+		solutionUnlocked: proximityPath || effortPath,
+		attemptCount,
+		bestProximityPct: Math.round(bestProximity * 100),
+		bestRowScorePct: Math.round(bestRowScore * 100),
+		anyColumnsCorrect,
+		distinctSeriousAttempts,
+		existingCompletion: null,
+	};
 }
 
 // gpt-4.1-nano pricing (as of 2026-06): $0.10 / 1M input tokens, $0.40 / 1M output tokens
@@ -344,10 +416,14 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 			},
 		});
 
-		const { solutionUnlocked, attemptCount, bestRatio } = await getSolutionUnlockStatus(
-			req.session.userId,
-			id
-		);
+		const {
+			solutionUnlocked,
+			attemptCount,
+			bestProximityPct,
+			bestRowScorePct,
+			anyColumnsCorrect,
+			distinctSeriousAttempts,
+		} = await getSolutionUnlockStatus(req.session.userId, id);
 
 		// Prev/next navigation within the same topic
 		const topicQuestions = await Question.findAll({
@@ -400,7 +476,12 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 			solutionUnlocked,
 			solutionQuery: solutionUnlocked ? (question.solution || '') : '',
 			attemptCount,
-			bestRowMatchPct: Math.round(bestRatio * 100),
+			bestProximityPct,
+			bestRowScorePct,
+			anyColumnsCorrect,
+			distinctSeriousAttempts,
+			unlockEffortTarget: UNLOCK_EFFORT_DISTINCT,
+			unlockMinAttempts: UNLOCK_MIN_ATTEMPTS,
 			prevId,
 			nextId,
 			questionIndex: idx + 1,
@@ -545,14 +626,9 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			}
 		}
 
-		// Only expose the solution in the response if it is unlocked
-		const {
-			solutionUnlocked: execSolutionUnlocked,
-			attemptCount: execAttemptCount,
-			bestRatio: execBestRatio,
-		} = await getSolutionUnlockStatus(userId, id);
-
-		// Log the query attempt
+		// Log the query attempt FIRST so the unlock status below reflects it —
+		// an attempt that crosses the threshold unlocks in the same response.
+		// `executed` and `queryHash` power the distinct-serious-attempt fallback.
 		const userForLog = await User.findByPk(userId);
 		await logInteraction(userId, id, "query_attempt", {
 			queryText: query,
@@ -563,7 +639,33 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			studentRows: comparison?.studentResult?.rows ?? 0,
 			solutionRows: comparison?.solutionResult?.rows ?? 0,
 			isLate: pastDeadline,
+			executed: result.success === true,
+			queryHash: hashQuery(query),
 		}, userForLog);
+
+		// Compute unlock status including the attempt just logged, and expose the
+		// solution only if unlocked.
+		const {
+			solutionUnlocked: execSolutionUnlocked,
+			attemptCount: execAttemptCount,
+			bestProximityPct: execBestProximityPct,
+			bestRowScorePct: execBestRowScorePct,
+			anyColumnsCorrect: execAnyColumnsCorrect,
+			distinctSeriousAttempts: execDistinctSeriousAttempts,
+		} = await getSolutionUnlockStatus(userId, id);
+
+		// Selective nudge tying the unlock rule to the query the student just ran.
+		// Only shown while still locked and when this attempt didn't advance a bar.
+		let unlockHint = null;
+		if (!isCompleted && !execSolutionUnlocked && result.success) {
+			if (isSelectStar(query)) {
+				unlockHint =
+					"Generic SELECT * queries don't count toward unlocking. Select the specific columns the question asks for.";
+			} else if (comparison && comparison.columnsMatch === false) {
+				unlockHint =
+					"This attempt didn't move you closer to unlocking — you're selecting the wrong number of columns. Match the columns the question asks for.";
+			}
+		}
 
 		// Return the results
 		return res.json({
@@ -579,7 +681,12 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			pastGrace: pastGrace,
 			solutionUnlocked: execSolutionUnlocked,
 			attemptCount: execAttemptCount,
-			bestRowMatchPct: Math.round(execBestRatio * 100),
+			bestProximityPct: execBestProximityPct,
+			bestRowScorePct: execBestRowScorePct,
+			anyColumnsCorrect: execAnyColumnsCorrect,
+			distinctSeriousAttempts: execDistinctSeriousAttempts,
+			unlockEffortTarget: UNLOCK_EFFORT_DISTINCT,
+			unlockHint,
 		});
 	} catch (error) {
 		console.error("Error executing SQL query:", error);

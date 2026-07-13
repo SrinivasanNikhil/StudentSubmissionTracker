@@ -50,9 +50,9 @@
                             <i class="bi bi-circle me-1"></i> Not completed
                         </span>
                         <span class="text-muted small" id="unlock-progress-label"
-                              title="Attempt at least 5 times with 75%+ row match to unlock the solution">
+                              title="Unlock by getting close (right columns + within 25% of the expected rows) or by making several different genuine attempts">
                             <i class="bi bi-lock me-1"></i>
-                            Solution: <%= attemptCount %>/5 attempts<% if (attemptCount > 0) { %>, <%= bestRowMatchPct %>% match<% } %>
+                            Solution: best match <%= bestProximityPct %>% &middot; <%= distinctSeriousAttempts %>/<%= unlockEffortTarget %> tries
                         </span>
                     <% } else { %>
                         <span class="badge rounded-pill px-3 py-2 completion-badge-incomplete"
@@ -81,6 +81,7 @@
                         <div>
                             Marked complete when your query returns the same number of rows <em>and</em> columns as the reference.
                             Column aliases and ordering don't matter.
+                            <br>Stuck? The solution unlocks as you get close, or after several genuine attempts &mdash; trivial queries like <code>SELECT *</code> won't unlock it.
                         </div>
                         <button type="button" class="btn-close ms-auto flex-shrink-0"
                                 onclick="dismissRulesAlert()" aria-label="Close"></button>
@@ -256,11 +257,26 @@
                         <div id="solution-lock-notice" class="alert alert-secondary mb-3" <% if (solutionUnlocked) { %>style="display:none"<% } %>>
                             <i class="bi bi-lock me-2"></i>
                             <strong>Solution locked.</strong>
-                            Complete at least 5 attempts with at least 75% of the expected rows matched to unlock the solution.
-                            <br><small class="text-muted">
-                                Current progress: <%= attemptCount %> attempt<%= attemptCount !== 1 ? 's' : '' %>,
-                                best row match: <%= bestRowMatchPct %>%
+                            It unlocks when you get close to the answer &mdash; <em>or</em> after several genuine attempts.
+                            <ul class="mb-1 mt-2 small">
+                                <li>
+                                    <strong>Getting close:</strong>
+                                    the right columns <em>and</em> within 25% of the expected rows on one query
+                                    &mdash; best so far: <strong id="lock-proximity-pct"><%= bestProximityPct %>%</strong>
+                                </li>
+                                <li>
+                                    <strong>Or keep trying:</strong>
+                                    <strong id="lock-distinct-count"><%= distinctSeriousAttempts %></strong> / <%= unlockEffortTarget %> different real attempts
+                                </li>
+                            </ul>
+                            <small class="text-muted">
+                                Generic <code>SELECT *</code> queries and repeating the same query don't count toward either.
                             </small>
+                            <div id="lock-diagnostic" class="small text-info mt-2"
+                                 <% if (!(bestRowScorePct >= 75 && !anyColumnsCorrect)) { %>style="display:none"<% } %>>
+                                <i class="bi bi-lightbulb me-1"></i>
+                                You're returning about the right number of rows but the wrong columns &mdash; select the specific columns the question asks for.
+                            </div>
                         </div>
                         <h6 class="text-muted mb-3">
                             <i class="bi bi-list-check me-2"></i>
@@ -692,6 +708,8 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                         solutionUnlocked = true;
                         if (solutionUnlockedInput) solutionUnlockedInput.value = 'true';
                         if (lockNotice) lockNotice.style.display = 'none';
+                        const staleNudge = document.getElementById('unlock-nudge');
+                        if (staleNudge) staleNudge.style.display = 'none';
                         if (solutionSection) solutionSection.style.display = '';
                         // Inject the solution footer into the AI panel card if it isn't there yet
                         const aiCard = document.querySelector('.col-md-4 .card');
@@ -751,22 +769,42 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                             unlockLabel.innerHTML = '<i class="bi bi-unlock me-1"></i>Solution unlocked';
                         }
                     } else if (!result.solutionUnlocked) {
-                        // Still locked: update progress counter
-                        if (lockNotice) {
-                            const progressText = lockNotice.querySelector('small');
-                            if (progressText) {
-                                const count = result.attemptCount || 0;
-                                const pct = result.bestRowMatchPct || 0;
-                                progressText.textContent =
-                                    `Current progress: ${count} attempt${count !== 1 ? 's' : ''}, best row match: ${pct}%`;
-                            }
+                        // Still locked: update live progress on both unlock paths
+                        const proximityPct = result.bestProximityPct || 0;
+                        const distinct = result.distinctSeriousAttempts || 0;
+                        const target = result.unlockEffortTarget || 10;
+
+                        const proximityEl = document.getElementById('lock-proximity-pct');
+                        if (proximityEl) proximityEl.textContent = `${proximityPct}%`;
+                        const distinctEl = document.getElementById('lock-distinct-count');
+                        if (distinctEl) distinctEl.textContent = distinct;
+
+                        // Diagnostic: right row count but wrong columns
+                        const diagnostic = document.getElementById('lock-diagnostic');
+                        if (diagnostic) {
+                            const showDiag = (result.bestRowScorePct || 0) >= 75 && !result.anyColumnsCorrect;
+                            diagnostic.style.display = showDiag ? '' : 'none';
                         }
+
+                        // Selective nudge tied to the attempt just run
+                        let nudge = document.getElementById('unlock-nudge');
+                        if (result.unlockHint) {
+                            if (!nudge) {
+                                nudge = document.createElement('div');
+                                nudge.id = 'unlock-nudge';
+                                nudge.className = 'alert alert-warning py-2 px-3 small mt-2 mb-0';
+                                lockNotice.parentNode.insertBefore(nudge, lockNotice.nextSibling);
+                            }
+                            nudge.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>${result.unlockHint}`;
+                            nudge.style.display = '';
+                        } else if (nudge) {
+                            nudge.style.display = 'none';
+                        }
+
                         // Update header unlock label
                         const unlockLabel = document.getElementById('unlock-progress-label');
                         if (unlockLabel) {
-                            const count = result.attemptCount || 0;
-                            const pct = result.bestRowMatchPct || 0;
-                            unlockLabel.innerHTML = `<i class="bi bi-lock me-1"></i>Solution: ${count}/5 attempts${count > 0 ? ', ' + pct + '% match' : ''}`;
+                            unlockLabel.innerHTML = `<i class="bi bi-lock me-1"></i>Solution: best match ${proximityPct}% &middot; ${distinct}/${target} tries`;
                         }
                     }
                 }
