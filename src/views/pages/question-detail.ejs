@@ -603,7 +603,17 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                 }
 
                 // Handle comparison results if available
-                if (result.comparison) {
+                if (result.solutionError || (result.comparison && result.comparison.solutionError)) {
+                    // The reference solution itself failed to execute. Do NOT show
+                    // a row/column mismatch — the student's query is fine. Show an
+                    // honest notice and stop (no comparison, no unlock changes).
+                    feedbackBox.className = 'alert alert-info';
+                    feedbackBox.innerHTML = '<i class="bi bi-tools me-2"></i>' +
+                        '<strong>There’s a problem with this question’s reference solution.</strong> ' +
+                        'Your query ran fine — this is not an error on your end. It has been flagged for review; ' +
+                        'please try another question in the meantime.';
+                    differencesContainer.style.display = 'none';
+                } else if (result.comparison) {
                     const comparison = result.comparison;
 
                     // Show feedback
@@ -697,8 +707,9 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                     }
                 }
 
-                // Update solution unlock state after every execute
-                if (result.solutionUnlocked !== undefined) {
+                // Update solution unlock state after every execute (skip when the
+                // reference solution is broken — that attempt isn't a real signal)
+                if (result.solutionUnlocked !== undefined && !result.solutionError) {
                     const lockNotice = document.getElementById('solution-lock-notice');
                     const solutionSection = document.getElementById('solution-section');
                     const solutionUnlockedInput = document.getElementById('solutionUnlocked');
