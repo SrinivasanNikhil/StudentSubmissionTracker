@@ -555,6 +555,14 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 		if (result.success && question.solution) {
 			comparison = await compareQueries(query, question.solution, databaseName);
 
+			// If the reference solution itself failed to execute, surface it
+			// loudly for ops and stop here — never treat it as a grading result.
+			if (comparison && comparison.solutionError) {
+				console.error(
+					`⚠️ BROKEN REFERENCE SOLUTION for question ${id} (${question.topic?.name}): ${comparison.error}`
+				);
+			}
+
 			// Check if the student query matches rows, columns, AND column names
 			// Also ensure the comparison object has all required properties for safety
 			if (
@@ -641,6 +649,7 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			isLate: pastDeadline,
 			executed: result.success === true,
 			queryHash: hashQuery(query),
+			solutionError: comparison?.solutionError === true,
 		}, userForLog);
 
 		// Compute unlock status including the attempt just logged, and expose the
@@ -687,6 +696,7 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			distinctSeriousAttempts: execDistinctSeriousAttempts,
 			unlockEffortTarget: UNLOCK_EFFORT_DISTINCT,
 			unlockHint,
+			solutionError: comparison?.solutionError === true,
 		});
 	} catch (error) {
 		console.error("Error executing SQL query:", error);

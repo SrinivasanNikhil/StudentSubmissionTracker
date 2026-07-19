@@ -381,6 +381,25 @@ const compareQueries = async (studentQuery, solutionQuery, databaseName) => {
 			};
 		}
 
+		// If the REFERENCE solution failed to execute, do not compare the
+		// student's (valid) result against an empty one — that would show a
+		// bogus "expected 0 rows / 0 columns" mismatch and make the student
+		// think they were wrong. Flag it so the route can log/alert and the UI
+		// can tell the student it's not their fault.
+		if (!solutionResult.success) {
+			return {
+				success: false,
+				solutionError: true,
+				message: "Reference solution failed to execute",
+				error: solutionResult.message,
+				differences: [],
+				feedback:
+					"There is a problem with this question's reference solution. Your query ran fine — this is not an error on your end. It has been flagged for review.",
+				studentResult,
+				solutionResult,
+			};
+		}
+
 		// Compare the results
 		const differences = [];
 		let isCorrect = true;
