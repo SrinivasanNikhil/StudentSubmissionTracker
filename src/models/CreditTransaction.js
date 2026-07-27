@@ -17,8 +17,10 @@ module.exports = (sequelize) => {
 				field: "question_id",
 			},
 			instructorCourseSectionId: {
+				// Nullable: AI usage by a student with no resolvable course section
+				// is still metered, and those rows carry no section.
 				type: DataTypes.INTEGER,
-				allowNull: false,
+				allowNull: true,
 				field: "instructor_course_section_id",
 			},
 			creditRequestId: {

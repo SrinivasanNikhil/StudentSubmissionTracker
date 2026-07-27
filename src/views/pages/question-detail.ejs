@@ -797,7 +797,7 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                                 const cgAnalysis = document.getElementById('chatgpt-analysis');
                                 try {
                                     cgLoad.style.display = 'block'; cgContent.innerHTML = ''; cgAnalysis.style.display = 'block';
-                                    const r = await fetch(`/questions/${questionId}/analyze`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userQuery: uq, referenceQuery: rq}) });
+                                    const r = await fetch(`/questions/${questionId}/analyze`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userQuery: uq}) });
                                     const data = await r.json();
                                     cgContent.innerHTML = data.success ? window.sstSanitizeHtml(data.analysis) : `<div class="alert alert-danger">${window.sstEscapeHtml(data.message || 'Failed')}</div>`;
                                 } catch(e) { cgContent.innerHTML = '<div class="alert alert-danger">Failed. Please try again.</div>'; }
@@ -929,10 +929,9 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        userQuery,
-                        referenceQuery
-                    })
+                    // referenceQuery is intentionally not sent — the server
+                    // loads the solution itself so it can't be spoofed.
+                    body: JSON.stringify({ userQuery })
                 });
 
                 const result = await response.json();
