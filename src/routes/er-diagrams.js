@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs").promises;
+const crypto = require("crypto");
 const {
 	Completion,
 	Question,
@@ -34,10 +35,36 @@ const storage = multer.diskStorage({
 		}
 	},
 	filename: (req, file, cb) => {
-		const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-		cb(null, `diagram-${uniqueSuffix}${path.extname(file.originalname)}`);
+		// NEVER derive the extension from file.originalname — it is user-controlled,
+		// and an attacker-chosen extension (e.g. .html) would be written to disk and
+		// later served with that content type, giving stored XSS on our own origin.
+		// The extension is hard-coded to .png; content is verified after write.
+		const uniqueSuffix = crypto.randomBytes(16).toString("hex");
+		cb(null, `diagram-${uniqueSuffix}.png`);
 	},
 });
+
+// PNG signature: \x89 P N G \r \n \x1a \n
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * Verify a file really is a PNG by reading its magic bytes. `file.mimetype` is
+ * just the client-supplied Content-Type header and is trivially spoofed, so it
+ * must never be the only check.
+ */
+async function isRealPng(filePath) {
+	let handle;
+	try {
+		handle = await fs.open(filePath, "r");
+		const { buffer, bytesRead } = await handle.read(Buffer.alloc(8), 0, 8, 0);
+		return bytesRead === 8 && buffer.equals(PNG_MAGIC);
+	} catch (error) {
+		console.error("Error verifying PNG signature:", error);
+		return false;
+	} finally {
+		if (handle) await handle.close().catch(() => {});
+	}
+}
 
 const upload = multer({
 	storage,
@@ -45,6 +72,7 @@ const upload = multer({
 		fileSize: 5 * 1024 * 1024, // 5MB limit
 	},
 	fileFilter: (req, file, cb) => {
+		// First-pass rejection only; the authoritative check is isRealPng() after write.
 		if (file.mimetype === "image/png") {
 			cb(null, true);
 		} else {
@@ -133,8 +161,8 @@ router.post(
 				});
 			}
 
-			// Validate file type
-			if (!req.file.mimetype.match(/^image\/png$/)) {
+			// Validate file type by CONTENT, not by the client-supplied mimetype.
+			if (!(await isRealPng(req.file.path))) {
 				await fs.unlink(req.file.path);
 				return res.status(400).json({
 					success: false,

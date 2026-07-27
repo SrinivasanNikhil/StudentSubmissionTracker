@@ -1,5 +1,71 @@
 // Main JavaScript file for SQL Practice application
 
+/**
+ * Escape a value for safe interpolation into an HTML string.
+ *
+ * Use this for EVERY user- or DB-supplied value that is placed into an
+ * innerHTML template literal, including inside attribute values (the quote
+ * escaping below is what makes attribute use safe). Prefer building DOM with
+ * createElement + textContent where practical — see window.sstToast for the
+ * pattern — and reach for this helper when a template literal is clearer.
+ *
+ * Names, emails and other profile fields are attacker-controlled: a student can
+ * set their own first name, so anything rendered into an instructor's or
+ * admin's page must be escaped.
+ */
+window.sstEscapeHtml = function (value) {
+	if (value === null || value === undefined) return '';
+	return String(value)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+};
+
+/**
+ * Sanitize a fragment of HTML before it is assigned to innerHTML.
+ *
+ * Intended for LLM output: the AI feedback prompts explicitly ask the model to
+ * format its reply as HTML, and those prompts embed student-supplied SQL — so a
+ * prompt injection could make the model emit markup. This strips every
+ * attribute (killing onerror/onclick/style/href vectors outright) and keeps
+ * only a small allowlist of formatting tags. Anything else is reduced to its
+ * text; script/style are dropped entirely.
+ */
+window.sstSanitizeHtml = function (html) {
+	const ALLOWED = new Set([
+		'P', 'BR', 'UL', 'OL', 'LI', 'STRONG', 'EM', 'B', 'I', 'U', 'CODE', 'PRE',
+		'H4', 'H5', 'H6', 'SPAN', 'DIV', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'HR'
+	]);
+	const doc = new DOMParser().parseFromString(String(html == null ? '' : html), 'text/html');
+
+	const walk = (node) => {
+		Array.from(node.childNodes).forEach((child) => {
+			if (child.nodeType === Node.TEXT_NODE) return;
+			if (child.nodeType !== Node.ELEMENT_NODE) {
+				child.remove();
+				return;
+			}
+			const tag = child.tagName.toUpperCase();
+			if (tag === 'SCRIPT' || tag === 'STYLE') {
+				child.remove();
+				return;
+			}
+			if (!ALLOWED.has(tag)) {
+				child.replaceWith(document.createTextNode(child.textContent || ''));
+				return;
+			}
+			// Strip every attribute — no exceptions.
+			Array.from(child.attributes).forEach((attr) => child.removeAttribute(attr.name));
+			walk(child);
+		});
+	};
+
+	walk(doc.body);
+	return doc.body.innerHTML;
+};
+
 // Global toast notification system
 window.sstToast = function(type, message, duration) {
 	if (duration === undefined) duration = 4000;
