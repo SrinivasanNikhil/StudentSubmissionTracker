@@ -52,8 +52,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "../public")));
 
-// Serve uploaded files
-app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+// NOTE: uploaded ER diagrams are NOT served statically — they contain student
+// coursework and are access-controlled. The /uploads router is mounted after
+// the session middleware (it needs req.session) alongside the other routes.
 
 // Create session store
 const sessionStore = new SequelizeStore({
@@ -136,6 +137,7 @@ const questionRoutes = require("./routes/questions");
 const completionRoutes = require("./routes/completions");
 const profileRoutes = require("./routes/profile");
 const erDiagramRoutes = require("./routes/er-diagrams");
+const uploadRoutes = require("./routes/uploads");
 
 // Register routes
 app.use("/auth", authRoutes);
@@ -147,6 +149,7 @@ app.use("/questions", questionRoutes);
 app.use("/completions", completionRoutes);
 app.use("/profile", profileRoutes);
 app.use("/er-diagrams", erDiagramRoutes);
+app.use("/uploads", uploadRoutes);
 
 // Root-level auth routes (for backward compatibility and direct access)
 const { isAuthenticated, isNotAuthenticated } = require("./middleware/auth");

@@ -42,10 +42,12 @@ router.get("/", isAuthenticated, async (req, res) => {
 			title: "My Profile",
 			user: userData,
 			success: req.session.success,
+			error: req.session.error,
 		});
 
-		// Clear any success message after displaying it
+		// Clear any flash messages after displaying them
 		delete req.session.success;
+		delete req.session.error;
 	} catch (error) {
 		console.error("Error fetching profile:", error);
 		res.status(500).render("pages/error", {
@@ -130,6 +132,14 @@ router.post("/update", isAuthenticated, async (req, res) => {
 		res.redirect("/profile");
 	} catch (error) {
 		console.error("Error updating profile:", error);
+
+		// Field validation failures (e.g. invalid characters in a name) are the
+		// user's to correct — show them the reason rather than a 500 page.
+		if (error.name === "SequelizeValidationError") {
+			req.session.error = error.errors.map((e) => e.message).join(". ");
+			return res.redirect("/profile");
+		}
+
 		res.status(500).render("pages/error", {
 			title: "Error",
 			message: "Failed to update profile. Please try again later.",

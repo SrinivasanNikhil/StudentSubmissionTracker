@@ -105,13 +105,39 @@ module.exports = (sequelize) => {
 				type: DataTypes.STRING,
 				allowNull: false,
 			},
+			// Names are rendered in instructor and admin views, so they are
+			// bounded and restricted at write time as defense in depth behind
+			// output escaping. Angle brackets and quotes are rejected outright —
+			// no legitimate name needs them.
 			firstName: {
 				type: DataTypes.STRING,
 				allowNull: true,
+				validate: {
+					len: { args: [0, 100], msg: "First name must be 100 characters or fewer" },
+					noMarkup(value) {
+						// Only angle brackets and backslash are rejected. Apostrophes and
+					// quotes are legitimate in names (O'Brien), and output escaping —
+					// not this filter — is what makes them safe to render.
+					if (value && /[<>\\]/.test(value)) {
+							throw new Error("First name contains invalid characters");
+						}
+					},
+				},
 			},
 			lastName: {
 				type: DataTypes.STRING,
 				allowNull: true,
+				validate: {
+					len: { args: [0, 100], msg: "Last name must be 100 characters or fewer" },
+					noMarkup(value) {
+						// Only angle brackets and backslash are rejected. Apostrophes and
+					// quotes are legitimate in names (O'Brien), and output escaping —
+					// not this filter — is what makes them safe to render.
+					if (value && /[<>\\]/.test(value)) {
+							throw new Error("Last name contains invalid characters");
+						}
+					},
+				},
 			},
 			code: {
 				type: DataTypes.STRING,

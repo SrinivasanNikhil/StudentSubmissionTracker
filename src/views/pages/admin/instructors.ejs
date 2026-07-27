@@ -397,13 +397,16 @@
                         if (result.students.length === 0) {
                             studentsList.innerHTML = '<p class="text-muted text-center">No students associated with this instructor.</p>';
                         } else {
+                            // Student-supplied fields (email, names) MUST be escaped —
+                            // they are set by the student and rendered here in an admin's session.
+                            const esc = window.sstEscapeHtml;
                             const studentsHtml = result.students.map(student => `
                             <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
                                 <div>
-                                    <strong>${student.email}</strong>
-                                    ${student.firstName || student.lastName ? `<br><small class="text-muted">${student.firstName || ''} ${student.lastName || ''}</small>` : ''}
+                                    <strong>${esc(student.email)}</strong>
+                                    ${student.firstName || student.lastName ? `<br><small class="text-muted">${esc(student.firstName || '')} ${esc(student.lastName || '')}</small>` : ''}
                                 </div>
-                                <small class="text-muted">Registered: ${new Date(student.createdAt).toLocaleDateString()}</small>
+                                <small class="text-muted">Registered: ${esc(new Date(student.createdAt).toLocaleDateString())}</small>
                             </div>
                         `).join('');
                             studentsList.innerHTML = studentsHtml;
@@ -436,26 +439,30 @@
                         if (result.courseSections.length === 0) {
                             courseSectionsList.innerHTML = '<p class="text-muted text-center">No course sections found for this instructor.</p>';
                         } else {
+                            // Section fields are instructor-supplied free text; escape them
+                            // (including inside the data-* attribute, where an unescaped
+                            // quote would allow an injected event handler).
+                            const escS = window.sstEscapeHtml;
                             const courseSectionsHtml = result.courseSections.map(section => `
                             <div class="card mb-3">
                                 <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h6 class="mb-0">${section.displayName}</h6>
+                                    <h6 class="mb-0">${escS(section.displayName)}</h6>
                                     <span class="badge ${section.isActive ? 'bg-success' : 'bg-secondary'}">${section.isActive ? 'Active' : 'Inactive'}</span>
                                 </div>
                                 <div class="card-body">
                                     <div class="row">
                                         <div class="col-md-6">
-                                            <p><strong>Course:</strong> ${section.courseCode} - ${section.courseName}</p>
-                                            <p><strong>Section:</strong> ${section.sectionCode}</p>
-                                            <p><strong>Semester:</strong> ${section.semester} ${section.academicYear}</p>
+                                            <p><strong>Course:</strong> ${escS(section.courseCode)} - ${escS(section.courseName)}</p>
+                                            <p><strong>Section:</strong> ${escS(section.sectionCode)}</p>
+                                            <p><strong>Semester:</strong> ${escS(section.semester)} ${escS(section.academicYear)}</p>
                                         </div>
                                         <div class="col-md-6">
-                                            <p><strong>Students:</strong> <span class="badge bg-info">${section.studentCount}</span></p>
-                                            <p><strong>Created:</strong> ${new Date(section.createdAt).toLocaleDateString()}</p>
+                                            <p><strong>Students:</strong> <span class="badge bg-info">${escS(section.studentCount)}</span></p>
+                                            <p><strong>Created:</strong> ${escS(new Date(section.createdAt).toLocaleDateString())}</p>
                                             <button class="btn btn-sm btn-outline-primary view-course-students"
-                                                data-instructor-id="${instructorId}"
-                                                data-section-id="${section.id}"
-                                                data-section-name="${section.displayName}">
+                                                data-instructor-id="${escS(instructorId)}"
+                                                data-section-id="${escS(section.id)}"
+                                                data-section-name="${escS(section.displayName)}">
                                                 <i class="bi bi-people"></i> View Students
                                             </button>
                                         </div>
@@ -483,14 +490,15 @@
                                             if (studentResult.students.length === 0) {
                                                 courseSectionStudentsList.innerHTML = '<p class="text-muted text-center">No students registered for this course section.</p>';
                                             } else {
+                                                const esc2 = window.sstEscapeHtml;
                                                 const studentsHtml = studentResult.students.map(student => `
                                                 <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
                                                     <div>
-                                                        <strong>${student.email}</strong>
-                                                        ${student.firstName || student.lastName ? `<br><small class="text-muted">${student.firstName || ''} ${student.lastName || ''}</small>` : ''}
-                                                        ${student.academicYear && student.semester ? `<br><small class="text-muted">${student.semester} ${student.academicYear}</small>` : ''}
+                                                        <strong>${esc2(student.email)}</strong>
+                                                        ${student.firstName || student.lastName ? `<br><small class="text-muted">${esc2(student.firstName || '')} ${esc2(student.lastName || '')}</small>` : ''}
+                                                        ${student.academicYear && student.semester ? `<br><small class="text-muted">${esc2(student.semester)} ${esc2(student.academicYear)}</small>` : ''}
                                                     </div>
-                                                    <small class="text-muted">Registered: ${new Date(student.createdAt).toLocaleDateString()}</small>
+                                                    <small class="text-muted">Registered: ${esc2(new Date(student.createdAt).toLocaleDateString())}</small>
                                                 </div>
                                             `).join('');
                                                 courseSectionStudentsList.innerHTML = studentsHtml;

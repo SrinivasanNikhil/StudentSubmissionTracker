@@ -444,45 +444,75 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                 executionStatus.style.display = 'block';
 
                 if (!result.success) {
-                    // Handle API-level error
-                    //alert(result.executionResult.error);
+                    // Handle API-level error.
+                    //
+                    // MySQL error strings echo back a fragment of the submitted query,
+                    // so this text is attacker-controlled. Build the DOM with
+                    // textContent — never innerHTML string interpolation.
                     executionStatus.className = 'alert alert-danger';
-                    let errorMessage = `<div class="error-details">`;
+                    executionStatus.innerHTML = '';
 
-                    // Display the main error message
-                    errorMessage += `<div class="mb-2"><strong>Error:</strong> ${result.executionResult.message || 'An error occurred'}</div>`;
+                    const execRes = result.executionResult || {};
+                    const details = document.createElement('div');
+                    details.className = 'error-details';
 
-                    // If there's an execution result with error details, display them
-                    if (result.executionResult && !result.executionResult.success) {
+                    const labelled = (labelText, value, className) => {
+                        const row = document.createElement('div');
+                        if (className) row.className = className;
+                        const strong = document.createElement('strong');
+                        strong.textContent = labelText + ' ';
+                        row.appendChild(strong);
+                        row.appendChild(document.createTextNode(value));
+                        return row;
+                    };
 
-                        errorMessage += `<div class="mt-2"><strong>Database Error:</strong> ${result.executionResult.message || 'Unknown database error'}</div>`;
+                    details.appendChild(labelled('Error:', execRes.message || 'An error occurred', 'mb-2'));
 
-                        // Add the full error string if available
-                        if (result.executionResult.error) {
+                    if (result.executionResult && !execRes.success) {
+                        details.appendChild(labelled('Database Error:', execRes.message || 'Unknown database error', 'mt-2'));
 
-                            errorMessage += `<div class="mt-2"><strong>Technical Details:</strong><br><code>${result.executionResult.error}</code></div>`;
+                        if (execRes.error) {
+                            const techWrap = document.createElement('div');
+                            techWrap.className = 'mt-2';
+                            const techLabel = document.createElement('strong');
+                            techLabel.textContent = 'Technical Details:';
+                            techWrap.appendChild(techLabel);
+                            techWrap.appendChild(document.createElement('br'));
+                            const code = document.createElement('code');
+                            code.textContent = execRes.error;
+                            techWrap.appendChild(code);
+                            details.appendChild(techWrap);
                         }
 
-                        // Add additional error details in a collapsible section
-                        if (result.executionResult.errorCode || result.executionResult.errorState || result.executionResult.errorNumber) {
+                        if (execRes.errorCode || execRes.errorState || execRes.errorNumber) {
+                            const wrap = document.createElement('div');
+                            wrap.className = 'mt-2';
 
-                            errorMessage += `<div class="mt-2">
-                                <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#errorDetails">
-                                    Show Additional Error Details
-                                </button>
-                                <div class="collapse mt-2" id="errorDetails">
-                                    <div class="card card-body bg-light">
-                                        ${result.executionResult.errorCode ? `<div><strong>Error Code:</strong> ${result.executionResult.errorCode}</div>` : ''}
-                                        ${result.executionResult.errorState ? `<div><strong>SQL State:</strong> ${result.executionResult.errorState}</div>` : ''}
-                                        ${result.executionResult.errorNumber ? `<div><strong>Error Number:</strong> ${result.executionResult.errorNumber}</div>` : ''}
-                                    </div>
-                                </div>
-                            </div>`;
+                            const btn = document.createElement('button');
+                            btn.className = 'btn btn-sm btn-outline-danger';
+                            btn.type = 'button';
+                            btn.setAttribute('data-bs-toggle', 'collapse');
+                            btn.setAttribute('data-bs-target', '#errorDetails');
+                            btn.textContent = 'Show Additional Error Details';
+                            wrap.appendChild(btn);
+
+                            const collapse = document.createElement('div');
+                            collapse.className = 'collapse mt-2';
+                            collapse.id = 'errorDetails';
+                            const card = document.createElement('div');
+                            card.className = 'card card-body bg-light';
+
+                            if (execRes.errorCode) card.appendChild(labelled('Error Code:', String(execRes.errorCode)));
+                            if (execRes.errorState) card.appendChild(labelled('SQL State:', String(execRes.errorState)));
+                            if (execRes.errorNumber) card.appendChild(labelled('Error Number:', String(execRes.errorNumber)));
+
+                            collapse.appendChild(card);
+                            wrap.appendChild(collapse);
+                            details.appendChild(wrap);
                         }
                     }
 
-                    errorMessage += `</div>`;
-                    executionStatus.innerHTML = errorMessage;
+                    executionStatus.appendChild(details);
 
                     // Ensure the results section is visible and scroll to it
                     resultsSection.style.display = 'block';
@@ -769,7 +799,7 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                                     cgLoad.style.display = 'block'; cgContent.innerHTML = ''; cgAnalysis.style.display = 'block';
                                     const r = await fetch(`/questions/${questionId}/analyze`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userQuery: uq, referenceQuery: rq}) });
                                     const data = await r.json();
-                                    cgContent.innerHTML = data.success ? data.analysis : `<div class="alert alert-danger">${data.message || 'Failed'}</div>`;
+                                    cgContent.innerHTML = data.success ? window.sstSanitizeHtml(data.analysis) : `<div class="alert alert-danger">${window.sstEscapeHtml(data.message || 'Failed')}</div>`;
                                 } catch(e) { cgContent.innerHTML = '<div class="alert alert-danger">Failed. Please try again.</div>'; }
                                 finally { cgLoad.style.display = 'none'; }
                             });
@@ -908,9 +938,9 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                 const result = await response.json();
 
                 if (result.success) {
-                    chatgptContent.innerHTML = result.analysis;
+                    chatgptContent.innerHTML = window.sstSanitizeHtml(result.analysis);
                 } else {
-                    chatgptContent.innerHTML = `<div class="alert alert-danger">${result.message || 'Failed to analyze queries'}</div>`;
+                    chatgptContent.innerHTML = `<div class="alert alert-danger">${window.sstEscapeHtml(result.message || 'Failed to analyze queries')}</div>`;
                 }
             } catch (error) {
                 console.error('Error analyzing queries:', error);
@@ -1013,13 +1043,13 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                     updateCreditsLabel(creditsRemaining);
                     renderNoCreditsUI();
                 } else if (result.success) {
-                    aiFeedbackPanel.innerHTML = result.analysis;
+                    aiFeedbackPanel.innerHTML = window.sstSanitizeHtml(result.analysis);
                     if (hasCreditSection && !creditUnlimited && result.creditsRemaining !== undefined) {
                         creditsRemaining = result.creditsRemaining;
                         updateCreditsLabel(creditsRemaining);
                     }
                 } else {
-                    aiFeedbackPanel.innerHTML = `<div class="alert alert-warning">${result.message || 'Failed to analyze query'}</div>`;
+                    aiFeedbackPanel.innerHTML = `<div class="alert alert-warning">${window.sstEscapeHtml(result.message || 'Failed to analyze query')}</div>`;
                 }
             } catch (error) {
                 console.error('Error getting AI feedback:', error);
