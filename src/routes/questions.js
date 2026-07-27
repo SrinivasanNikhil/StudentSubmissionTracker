@@ -953,7 +953,6 @@ router.post("/:id/execute", isAuthenticated, executeLimiter, async (req, res) =>
 		return res.status(500).json({
 			success: false,
 			message: "Error executing query",
-			error: error.message,
 			executionResult: {
 				success: false,
 				message: error.message,
@@ -1094,7 +1093,6 @@ Format your response in a clear, structured way using HTML formatting.`;
 		return res.status(500).json({
 			success: false,
 			message: "Failed to analyze queries",
-			error: error.message,
 		});
 	}
 });
@@ -1208,7 +1206,6 @@ Format the response in HTML with appropriate styling.`;
 		return res.status(500).json({
 			success: false,
 			message: "Error analyzing query",
-			error: error.message,
 		});
 	}
 });
@@ -1440,7 +1437,6 @@ IMPORTANT: Your response must be a valid JSON object. Do not include any text be
 			return res.status(500).json({
 				error: "OpenAI API Error",
 				message: "Failed to get evaluation from OpenAI",
-				details: openaiError.message,
 			});
 		}
 
@@ -1448,7 +1444,6 @@ IMPORTANT: Your response must be a valid JSON object. Do not include any text be
 		let response;
 		try {
 			const content = completion.choices[0].message.content;
-			console.log("Raw OpenAI response:", content);
 
 			// Try to extract JSON from the response
 			const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -1466,7 +1461,6 @@ IMPORTANT: Your response must be a valid JSON object. Do not include any text be
 			return res.status(500).json({
 				error: "Parse Error",
 				message: "Failed to parse OpenAI response",
-				details: parseError.message,
 			});
 		}
 
@@ -1520,7 +1514,6 @@ IMPORTANT: Your response must be a valid JSON object. Do not include any text be
 			return res.status(500).json({
 				error: "Database Error",
 				message: "Failed to save evaluation",
-				details: dbError.message,
 			});
 		}
 	} catch (error) {
@@ -1528,7 +1521,6 @@ IMPORTANT: Your response must be a valid JSON object. Do not include any text be
 		res.status(500).json({
 			error: "Unexpected Error",
 			message: "An unexpected error occurred",
-			details: error.message,
 		});
 	}
 });
@@ -1577,7 +1569,6 @@ router.get("/:id/completion", isAuthenticated, async (req, res) => {
 		res.status(500).json({
 			success: false,
 			message: "Error fetching completion data",
-			error: error.message,
 		});
 	}
 });

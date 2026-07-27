@@ -88,6 +88,15 @@ router.get("/users", isAuthenticated, isAdmin, async (req, res) => {
 		// Get users with pagination
 		const { count, rows: users } = await User.findAndCountAll({
 			where: whereCondition,
+			// Never load credential material into a render context.
+			attributes: {
+				exclude: [
+					"passwordHash",
+					"resetToken",
+					"resetTokenExpires",
+					"resetTokenUsed",
+				],
+			},
 			limit: parseInt(limit),
 			offset: parseInt(offset),
 			order: [["createdAt", "DESC"]],
@@ -666,32 +675,43 @@ router.post(
 				});
 			}
 
+			// Collect the affected students BEFORE unassigning them — the previous
+			// version queried after the update, so it always got an empty list.
+			const affectedStudents = await User.findAll({
+				where: { associatedInstructorId: id },
+				attributes: ["id"],
+			});
+			const affectedStudentIds = affectedStudents.map((s) => s.id);
+
 			// Unassign all students from this instructor
 			await User.update(
 				{ associatedInstructorId: null },
 				{ where: { associatedInstructorId: id } }
 			);
 
-			// Delete all completions associated with this instructor's students
-			const studentIds = await User.findAll({
-				where: { associatedInstructorId: id },
-				attributes: ["id"],
-			});
-
-			if (studentIds.length > 0) {
-				const studentIdArray = studentIds.map((student) => student.id);
-				await Completion.destroy({ where: { userId: studentIdArray } });
-			}
+			// NOTE: student completions are deliberately NOT deleted. The old code
+			// intended to (and claimed to in its response) but never actually did,
+			// because of the ordering bug above. Preserving them is the correct
+			// behavior: completions are the students' own work and the basis of the
+			// research dataset, and a student should not lose their record because
+			// an instructor account was removed. Only the association is cleared.
 
 			// Delete the instructor
 			await instructor.destroy();
 
-			// Revoke any live sessions for the deleted instructor.
+			// Revoke live sessions for the instructor, and for the unassigned
+			// students whose session copy of associatedInstructorId is now stale.
 			await destroyUserSessions(id);
+			for (const studentId of affectedStudentIds) {
+				await destroyUserSessions(studentId);
+			}
 
 			res.json({
 				success: true,
-				message: "Instructor and all associated data deleted successfully",
+				message:
+					affectedStudentIds.length > 0
+						? `Instructor deleted. ${affectedStudentIds.length} student(s) were unassigned; their completion history was preserved.`
+						: "Instructor deleted successfully.",
 			});
 		} catch (error) {
 			console.error("Error deleting instructor:", error);
