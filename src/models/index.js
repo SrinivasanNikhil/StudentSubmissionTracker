@@ -12,6 +12,7 @@ const InstructorSectionCreditSetting = require("./InstructorSectionCreditSetting
 const StudentCreditBalance = require("./StudentCreditBalance")(sequelize);
 const CreditTransaction = require("./CreditTransaction")(sequelize);
 const CreditRequest = require("./CreditRequest")(sequelize);
+const CourseSectionChange = require("./CourseSectionChange")(sequelize);
 
 // Define associations between models
 Topic.hasMany(Question, { foreignKey: "topicId", as: "questions" });
@@ -117,6 +118,10 @@ CreditRequest.belongsTo(InstructorCourseSection, {
 CreditRequest.hasMany(CreditTransaction, { foreignKey: "creditRequestId", as: "transactions" });
 CreditTransaction.belongsTo(CreditRequest, { foreignKey: "creditRequestId", as: "creditRequest" });
 
+// Course-section change audit trail
+User.hasMany(CourseSectionChange, { foreignKey: "userId", as: "sectionChanges" });
+CourseSectionChange.belongsTo(User, { foreignKey: "userId", as: "user" });
+
 // Re-export the models
 module.exports = {
 	User,
@@ -130,4 +135,5 @@ module.exports = {
 	StudentCreditBalance,
 	CreditTransaction,
 	CreditRequest,
+	CourseSectionChange,
 };

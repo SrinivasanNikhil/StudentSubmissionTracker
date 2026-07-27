@@ -104,22 +104,11 @@ router.get("/", isAuthenticated, async (req, res) => {
 	}
 });
 
-// Advanced: Create a new topic (optional, admin only)
-router.post("/", isAuthenticated, async (req, res) => {
-	try {
-		const { name } = req.body;
-
-		if (!name) {
-			return res.status(400).json({ error: "Topic name is required" });
-		}
-
-		const newTopic = await Topic.create({ name });
-
-		res.redirect("/topics");
-	} catch (error) {
-		console.error("Error creating topic:", error);
-		res.status(500).json({ error: "Failed to create topic" });
-	}
-});
+// NOTE: a POST /topics route used to exist here. Its comment claimed "admin
+// only" but it was guarded by isAuthenticated alone, so any student could
+// create global Topic rows visible to every user. It had no caller anywhere in
+// the app — topics are managed through the reference-data loader
+// (src/utils/referenceLoader.js), which upserts from src/reference_files/*.json.
+// The route was removed rather than guarded, to drop the write surface entirely.
 
 module.exports = router;

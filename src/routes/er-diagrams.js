@@ -19,6 +19,21 @@ const {
 const { Op } = require("sequelize");
 const openai = require("../services/openai");
 
+// Treat a principal as an admin only when they genuinely are one.
+//
+// The ownership checks below are deliberately written as "if NOT an admin,
+// scope to your own students" rather than "if an instructor, scope". The old
+// shape meant any principal reaching these handlers without
+// role === "instructor" — e.g. via the legacy isAdmin boolean that
+// isInstructorOrAdmin also accepts — skipped the ownership branch entirely and
+// got unrestricted read/grade access to every submission.
+function isAdminUser(sessionUser) {
+	return (
+		Boolean(sessionUser) &&
+		(sessionUser.role === "admin" || sessionUser.isAdmin === true)
+	);
+}
+
 // Ensure upload directory exists
 const uploadDir = path.join(__dirname, "../public/uploads/diagrams");
 fs.mkdir(uploadDir, { recursive: true }).catch(console.error);
@@ -253,8 +268,8 @@ router.get("/admin/submissions", isInstructorOrAdmin, async (req, res) => {
 			},
 		};
 
-		// If instructor, only show submissions from their students
-		if (req.session.user.role === "instructor") {
+		// Non-admins only ever see submissions from their own students
+		if (!isAdminUser(req.session.user)) {
 			const instructorId = req.session.user.id;
 			const students = await User.findAll({
 				where: {
@@ -335,8 +350,8 @@ router.get("/admin/submissions/:id", isInstructorOrAdmin, async (req, res) => {
 			});
 		}
 
-		// If instructor, verify the submission belongs to one of their students
-		if (req.session.user.role === "instructor") {
+		// Non-admins may only act on submissions from their own students
+		if (!isAdminUser(req.session.user)) {
 			const instructorId = req.session.user.id;
 			if (submission.user.associatedInstructorId !== instructorId) {
 				return res.status(403).render("pages/error", {
@@ -423,8 +438,8 @@ router.post("/admin/submissions/:id", isInstructorOrAdmin, async (req, res) => {
 			});
 		}
 
-		// If instructor, verify the submission belongs to one of their students
-		if (req.session.user.role === "instructor") {
+		// Non-admins may only act on submissions from their own students
+		if (!isAdminUser(req.session.user)) {
 			const instructorId = req.session.user.id;
 			if (submission.user.associatedInstructorId !== instructorId) {
 				return res.status(403).json({
@@ -487,8 +502,8 @@ router.post(
 				});
 			}
 
-			// If instructor, verify the submission belongs to one of their students
-			if (req.session.user.role === "instructor") {
+			// Non-admins may only act on submissions from their own students
+			if (!isAdminUser(req.session.user)) {
 				const instructorId = req.session.user.id;
 				if (submission.user.associatedInstructorId !== instructorId) {
 					return res.status(403).json({

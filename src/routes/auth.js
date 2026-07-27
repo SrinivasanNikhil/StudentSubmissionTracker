@@ -6,6 +6,7 @@ const { User, InstructorCourseSection } = require("../models");
 const { isAuthenticated, isNotAuthenticated } = require("../middleware/auth");
 const { validatePassword } = require("../utils/passwordValidator");
 const emailService = require("../utils/emailService");
+const { destroyUserSessions } = require("../utils/sessionRevocation");
 
 // Rate limiters for auth endpoints
 const loginLimiter = rateLimit({
@@ -510,6 +511,11 @@ router.post("/reset-password/:token", isNotAuthenticated, async (req, res) => {
 			resetTokenExpires: null,
 			resetTokenUsed: true,
 		});
+
+		// Revoke every existing session for this account. Resetting a password is
+		// the standard recovery path after a compromise, so any session an
+		// attacker already holds must not survive it.
+		await destroyUserSessions(user.id);
 
 		// Redirect to login with success message
 		req.flash(
