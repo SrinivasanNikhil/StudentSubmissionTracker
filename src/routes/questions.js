@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const { Question, Topic, Completion, User, InteractionLog, InstructorCourseSection, InstructorSectionTopicSetting, InstructorSectionCreditSetting, StudentCreditBalance, CreditTransaction, CreditRequest } = require("../models");
 const { isAuthenticated } = require("../middleware/auth");
+const { Op, fn, col } = require("sequelize");
+const rateLimit = require("express-rate-limit");
 const { executeQuery, compareQueries, isSelectOnly } = require("../services/sqlExecutor");
 const openai = require("../services/openai");
 
@@ -181,12 +183,6 @@ async function getCreditSetting(section) {
 	});
 }
 
-// Returns the cost-per-request for a section (defaults to 1 if no setting row)
-async function getCreditCost(section) {
-	const setting = await getCreditSetting(section);
-	return setting ? setting.costPerRequest : 1;
-}
-
 // Finds or lazily creates the StudentCreditBalance for this student/section/term.
 // Seeds with defaultCredits from the section setting (or 10 if no setting exists).
 async function getOrCreateCreditBalance(user, section) {
@@ -204,7 +200,27 @@ async function getOrCreateCreditBalance(user, section) {
 	if (existing) return existing;
 
 	const setting = await getCreditSetting(section);
-	const seedAmount = setting ? setting.defaultCredits : 10;
+
+	// Balances are keyed per (user, section, term), so seeding a fresh allotment
+	// for every new section let a student reset their credits by switching
+	// sections (drain section A -> switch to B -> new allotment -> switch back).
+	// If they already hold a balance this term, carry the remainder over instead
+	// of granting again.
+	const priorInTerm = await StudentCreditBalance.findOne({
+		where: {
+			userId: user.id,
+			academicYear,
+			semester,
+			instructorCourseSectionId: { [Op.ne]: section.id },
+		},
+		order: [["updatedAt", "DESC"]],
+	});
+
+	const seedAmount = priorInTerm
+		? priorInTerm.creditsRemaining
+		: setting
+			? setting.defaultCredits
+			: 10;
 
 	const balance = await StudentCreditBalance.create({
 		userId: user.id,
@@ -275,6 +291,208 @@ async function spendCredit(user, section, balanceId, questionId, cost, usage) {
 	});
 
 	return newBalance;
+}
+
+// Per-user rate limits.
+//
+// Keyed on the session user rather than IP: an entire class behind campus NAT
+// shares one address, so IP keying would throttle everyone at once. Falls back
+// to IP for unauthenticated callers (these routes require auth, so that path is
+// effectively unused).
+//
+// Sizing: the busiest legitimate day observed in the logs was 236 AI calls by
+// one student, so the daily cap sits above that while still stopping a script.
+const rateLimitKey = (req) => String(req.session?.userId ?? req.ip);
+
+const executeLimiter = rateLimit({
+	windowMs: 60 * 1000,
+	max: 60,
+	keyGenerator: rateLimitKey,
+	standardHeaders: true,
+	legacyHeaders: false,
+	validate: { keyGeneratorIpFallback: false },
+	message: { success: false, message: "Too many queries. Please wait a moment and try again." },
+});
+
+const aiBurstLimiter = rateLimit({
+	windowMs: 60 * 1000,
+	max: 15,
+	keyGenerator: rateLimitKey,
+	standardHeaders: true,
+	legacyHeaders: false,
+	validate: { keyGeneratorIpFallback: false },
+	message: { success: false, message: "Too many AI requests. Please wait a moment and try again." },
+});
+
+const aiDailyLimiter = rateLimit({
+	windowMs: 24 * 60 * 60 * 1000,
+	max: 300,
+	keyGenerator: rateLimitKey,
+	standardHeaders: true,
+	legacyHeaders: false,
+	validate: { keyGeneratorIpFallback: false },
+	message: { success: false, message: "Daily AI request limit reached. Please try again tomorrow." },
+});
+
+// NOTE: the default store is in-memory and per-process. If this app is ever run
+// with more than one instance these limits become per-instance and would need a
+// shared store (e.g. rate-limit-redis).
+
+// Input bounds for anything interpolated into an OpenAI prompt. Unbounded body
+// fields are a direct token-cost and prompt-injection channel.
+const AI_QUERY_MAX_LENGTH = 2000;
+const AI_TEXT_MAX_LENGTH = 5000;
+
+// Per-term AI allowance for users with no resolvable course section. Before
+// this existed the credit gate lived entirely inside `if (section)`, so these
+// users — 405 of 478 students — got unlimited, unlogged OpenAI calls.
+const DEFAULT_SECTIONLESS_QUOTA = 50;
+
+// Credits already spent this term by a user with no course section. `amount` is
+// negative for spend rows, so the sum is negated to get a positive total.
+async function getSectionlessSpent(userId) {
+	const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+	const semester = InstructorCourseSection.getCurrentSemester();
+
+	const row = await CreditTransaction.findOne({
+		where: {
+			userId,
+			type: "spend",
+			instructorCourseSectionId: null,
+			academicYear,
+			semester,
+		},
+		attributes: [[fn("COALESCE", fn("SUM", col("amount")), 0), "total"]],
+		raw: true,
+	});
+
+	return Math.abs(Number((row && row.total) || 0));
+}
+
+/**
+ * Single gate for every OpenAI-backed endpoint. Returns a context object that
+ * recordAiSpend() consumes after a successful call.
+ *
+ * Modes:
+ *  - "unlimited"  — section opted out of metering; usage is still logged
+ *  - "section"    — normal per-section balance, atomically decremented
+ *  - "sectionless"— default per-term quota, enforced by summing ledger rows
+ */
+async function checkAiQuota(sessionUser) {
+	const section = await getStudentSection(sessionUser);
+
+	if (section) {
+		const setting = await getCreditSetting(section);
+		if (setting && setting.unlimited) {
+			return { allowed: true, mode: "unlimited", section, cost: 0 };
+		}
+		const cost = setting ? setting.costPerRequest : 1;
+		const balance = await getOrCreateCreditBalance(sessionUser, section);
+		if (balance.creditsRemaining < cost) {
+			return {
+				allowed: false,
+				mode: "section",
+				section,
+				cost,
+				remaining: balance.creditsRemaining,
+			};
+		}
+		return {
+			allowed: true,
+			mode: "section",
+			section,
+			cost,
+			balance,
+			remaining: balance.creditsRemaining,
+		};
+	}
+
+	const spent = await getSectionlessSpent(sessionUser.id);
+	const remaining = Math.max(0, DEFAULT_SECTIONLESS_QUOTA - spent);
+	return {
+		allowed: remaining >= 1,
+		mode: "sectionless",
+		cost: 1,
+		remaining,
+	};
+}
+
+/**
+ * Record usage after a successful OpenAI call. Returns the caller's remaining
+ * balance, or null when the mode has no balance to report.
+ *
+ * Trade-off: the "section" path uses an atomic conditional decrement and cannot
+ * double-spend. The "sectionless" path is count-then-write, so two concurrent
+ * calls could exceed the quota by one. That is acceptable for a cost guardrail
+ * (it is not billing), and avoids a balance row whose uniqueness MySQL could not
+ * enforce anyway with a NULL section id.
+ */
+async function recordAiSpend(quota, sessionUser, questionId, usage) {
+	if (quota.mode === "unlimited") {
+		await logUnlimitedSpend(sessionUser, quota.section, questionId, usage).catch(
+			(e) => console.error("Error logging unlimited spend transaction:", e)
+		);
+		return null;
+	}
+
+	if (quota.mode === "section") {
+		const newRemaining = await spendCredit(
+			sessionUser,
+			quota.section,
+			quota.balance.id,
+			questionId,
+			quota.cost,
+			usage
+		);
+		if (newRemaining === null) {
+			console.warn(
+				`Credit race condition for userId=${sessionUser.id} questionId=${questionId} — returning analysis without charging`
+			);
+			return 0;
+		}
+		return newRemaining;
+	}
+
+	// sectionless
+	const academicYear = InstructorCourseSection.getCurrentAcademicYear();
+	const semester = InstructorCourseSection.getCurrentSemester();
+	const promptTokens = usage ? usage.prompt_tokens : null;
+	const completionTokens = usage ? usage.completion_tokens : null;
+
+	await CreditTransaction.create({
+		userId: sessionUser.id,
+		questionId: questionId || null,
+		instructorCourseSectionId: null,
+		type: "spend",
+		amount: -quota.cost,
+		balanceAfter: null,
+		promptTokens,
+		completionTokens,
+		totalTokens: usage ? usage.total_tokens : null,
+		estimatedCostUsd: usage
+			? estimateCostUsd(promptTokens, completionTokens)
+			: null,
+		academicYear,
+		semester,
+		occurredAt: new Date(),
+	}).catch((e) => console.error("Error logging sectionless spend:", e));
+
+	return Math.max(0, quota.remaining - quota.cost);
+}
+
+// Standard 403 payload when a quota is exhausted. Shape matches what the
+// question page already handles (inline "request more credits" UI).
+function noCreditsResponse(res, quota) {
+	return res.status(403).json({
+		success: false,
+		code: "NO_CREDITS",
+		message:
+			quota.mode === "sectionless"
+				? "You have used all your AI feedback credits for this term."
+				: "You have used all your AI feedback credits. Request more from your instructor.",
+		creditsRemaining: quota.remaining,
+		costPerRequest: quota.cost,
+	});
 }
 
 // Writes a zero-amount CreditTransaction for unlimited sections (preserves research data)
@@ -527,7 +745,7 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 });
 
 // Execute a SQL query for a specific question
-router.post("/:id/execute", isAuthenticated, async (req, res) => {
+router.post("/:id/execute", isAuthenticated, executeLimiter, async (req, res) => {
 	try {
 		const { id } = req.params;
 		const { query } = req.body;
@@ -749,9 +967,13 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 });
 
 // Analyze queries using ChatGPT
-router.post("/:id/analyze", isAuthenticated, async (req, res) => {
+router.post("/:id/analyze", isAuthenticated, aiBurstLimiter, aiDailyLimiter, async (req, res) => {
 	try {
-		const { userQuery, referenceQuery } = req.body;
+		// The reference query is deliberately NOT taken from the request body.
+		// It used to be, which meant the "reference" side of the prompt was
+		// entirely attacker-controlled and unbounded — a free prompt-injection and
+		// token-cost channel. It is loaded from the question instead.
+		const { userQuery } = req.body;
 		const { id } = req.params;
 
 		// Enforce solution unlock gate
@@ -763,11 +985,55 @@ router.post("/:id/analyze", isAuthenticated, async (req, res) => {
 			});
 		}
 
-		if (!userQuery || !referenceQuery) {
+		if (!userQuery || !userQuery.trim()) {
 			return res.status(400).json({
 				success: false,
-				message: "Both user query and reference query are required",
+				message: "Your query is required",
 			});
+		}
+
+		// Same input bounds as analyze-syntax, which this route previously lacked.
+		if (userQuery.length > AI_QUERY_MAX_LENGTH) {
+			return res.status(400).json({
+				success: false,
+				message: "Query is too long. Please shorten your query.",
+			});
+		}
+
+		if (!isSelectOnly(userQuery)) {
+			return res.status(400).json({
+				success: false,
+				message: "Only SELECT queries can be analysed. Please write a SELECT statement.",
+			});
+		}
+
+		const analyzeQuestion = await Question.findByPk(id, {
+			include: [{ model: Topic, as: "topic" }],
+		});
+		if (!analyzeQuestion) {
+			return res.status(404).json({ success: false, message: "Question not found" });
+		}
+
+		if (await isTopicHiddenForUser(req.session.user, analyzeQuestion.topicId)) {
+			return res.status(403).json({
+				success: false,
+				message: "That topic is not available for your course section.",
+			});
+		}
+
+		const referenceQuery = analyzeQuestion.solution || "";
+		if (!referenceQuery) {
+			return res.status(400).json({
+				success: false,
+				message: "This question has no reference solution to compare against.",
+			});
+		}
+
+		// Credit gate — this endpoint previously had none at all.
+		const analyzeSessionUser = req.session.user;
+		const analyzeQuota = await checkAiQuota(analyzeSessionUser);
+		if (!analyzeQuota.allowed) {
+			return noCreditsResponse(res, analyzeQuota);
 		}
 
 		// Create a prompt for ChatGPT
@@ -806,9 +1072,22 @@ Format your response in a clear, structured way using HTML formatting.`;
 
 		const analysis = completion.choices[0].message.content;
 
+		const analyzeRemaining = await recordAiSpend(
+			analyzeQuota,
+			analyzeSessionUser,
+			id,
+			completion.usage
+		);
+
 		return res.json({
 			success: true,
 			analysis: analysis,
+			...(analyzeQuota.mode === "unlimited"
+				? { unlimited: true }
+				: {
+						creditsRemaining: analyzeRemaining,
+						costPerRequest: analyzeQuota.cost,
+					}),
 		});
 	} catch (error) {
 		console.error("Error analyzing queries:", error);
@@ -821,7 +1100,7 @@ Format your response in a clear, structured way using HTML formatting.`;
 });
 
 // On-demand AI syntax feedback
-router.post("/:id/analyze-syntax", isAuthenticated, async (req, res) => {
+router.post("/:id/analyze-syntax", isAuthenticated, aiBurstLimiter, aiDailyLimiter, async (req, res) => {
 	try {
 		const { query } = req.body;
 		const { id } = req.params;
@@ -835,7 +1114,7 @@ router.post("/:id/analyze-syntax", isAuthenticated, async (req, res) => {
 		}
 
 		// Reject oversized payloads (prompt injection / token abuse)
-		if (query.length > 2000) {
+		if (query.length > AI_QUERY_MAX_LENGTH) {
 			return res.status(400).json({
 				success: false,
 				message: "Query is too long. Please shorten your query.",
@@ -851,31 +1130,12 @@ router.post("/:id/analyze-syntax", isAuthenticated, async (req, res) => {
 			});
 		}
 
-		// Credit gate — only applies to students in a course section
+		// Credit gate — applies to EVERY user. Users without a course section are
+		// metered against a default per-term quota rather than being waved through.
 		const sessionUser = req.session.user;
-		const section = await getStudentSection(sessionUser);
-		let creditBalance = null;
-		let cost = 0;
-		let isUnlimited = false;
-
-		if (section) {
-			const creditSetting = await getCreditSetting(section);
-			isUnlimited = creditSetting ? creditSetting.unlimited : false;
-
-			if (!isUnlimited) {
-				cost = creditSetting ? creditSetting.costPerRequest : 1;
-				creditBalance = await getOrCreateCreditBalance(sessionUser, section);
-
-				if (creditBalance.creditsRemaining < cost) {
-					return res.status(403).json({
-						success: false,
-						code: "NO_CREDITS",
-						message: "You have used all your AI feedback credits. Request more from your instructor.",
-						creditsRemaining: creditBalance.creditsRemaining,
-						costPerRequest: cost,
-					});
-				}
-			}
+		const quota = await checkAiQuota(sessionUser);
+		if (!quota.allowed) {
+			return noCreditsResponse(res, quota);
 		}
 
 		const question = await Question.findByPk(id, {
@@ -932,37 +1192,14 @@ Format the response in HTML with appropriate styling.`;
 		}, user);
 
 		// Record credit spend / usage after successful OpenAI response
-		let newCreditsRemaining = null;
-		if (section) {
-			if (isUnlimited) {
-				await logUnlimitedSpend(sessionUser, section, id, usage).catch((e) =>
-					console.error("Error logging unlimited spend transaction:", e)
-				);
-			} else {
-				newCreditsRemaining = await spendCredit(
-					sessionUser,
-					section,
-					creditBalance.id,
-					id,
-					cost,
-					usage
-				);
-				if (newCreditsRemaining === null) {
-					// Race-lost: balance was drained concurrently; return analysis anyway
-					console.warn(`Credit race condition for userId=${userId} questionId=${id} — returning analysis without charging`);
-					newCreditsRemaining = 0;
-				}
-			}
-		}
+		const newCreditsRemaining = await recordAiSpend(quota, sessionUser, id, usage);
 
 		const responsePayload = { success: true, analysis };
-		if (section) {
-			if (isUnlimited) {
-				responsePayload.unlimited = true;
-			} else {
-				responsePayload.creditsRemaining = newCreditsRemaining;
-				responsePayload.costPerRequest = cost;
-			}
+		if (quota.mode === "unlimited") {
+			responsePayload.unlimited = true;
+		} else {
+			responsePayload.creditsRemaining = newCreditsRemaining;
+			responsePayload.costPerRequest = quota.cost;
 		}
 
 		return res.json(responsePayload);
@@ -1086,7 +1323,7 @@ function hashQuery(query) {
 }
 
 // Submit a data model answer
-router.post("/:id/submit-model", isAuthenticated, async (req, res) => {
+router.post("/:id/submit-model", isAuthenticated, aiBurstLimiter, aiDailyLimiter, async (req, res) => {
 	try {
 		const { id } = req.params;
 		const { answer, scenario } = req.body;
@@ -1096,6 +1333,19 @@ router.post("/:id/submit-model", isAuthenticated, async (req, res) => {
 			return res.status(400).json({
 				success: false,
 				message: "Answer is required",
+			});
+		}
+
+		// Both fields are interpolated into the prompt below; bound them. This
+		// endpoint previously had no cap at all while calling the most expensive
+		// model in the app.
+		if (
+			answer.length > AI_TEXT_MAX_LENGTH ||
+			(scenario && scenario.length > AI_TEXT_MAX_LENGTH)
+		) {
+			return res.status(400).json({
+				success: false,
+				message: `Your answer and scenario must each be ${AI_TEXT_MAX_LENGTH} characters or fewer.`,
 			});
 		}
 
@@ -1124,6 +1374,14 @@ router.post("/:id/submit-model", isAuthenticated, async (req, res) => {
 				success: false,
 				message: "This endpoint is only for data model questions",
 			});
+		}
+
+		// Credit gate — this endpoint previously had none, while calling the most
+		// expensive model in the app with an unbounded prompt.
+		const modelSessionUser = req.session.user;
+		const modelQuota = await checkAiQuota(modelSessionUser);
+		if (!modelQuota.allowed) {
+			return noCreditsResponse(res, modelQuota);
 		}
 
 		// Create a prompt for ChatGPT
@@ -1160,7 +1418,9 @@ IMPORTANT: Your response must be a valid JSON object. Do not include any text be
 		let completion;
 		try {
 			completion = await openai.chat.completions.create({
-				model: "gpt-4",
+				// gpt-4o: markedly cheaper per token than the legacy gpt-4 this used
+				// to call, and a better model for structured JSON output.
+				model: "gpt-4o",
 				messages: [
 					{
 						role: "system",

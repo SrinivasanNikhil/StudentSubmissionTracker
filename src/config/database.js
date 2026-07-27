@@ -1,6 +1,50 @@
 const { Sequelize } = require("sequelize");
 require("dotenv").config();
 
+// Student-submitted SQL runs against the practice databases. isSelectOnly()
+// stops writes, but it does nothing about COST: `SELECT * FROM OrderDetails a,
+// OrderDetails b, OrderDetails c` is a valid read that asks MySQL for roughly
+// 20 billion rows. With a shared pool and no statement timeout, a handful of
+// those would stall the practice databases for every student at once — and
+// they sit on the same host as the application database, so login is affected
+// too.
+//
+// max_execution_time applies to read-only SELECTs (MySQL 8.0), which is exactly
+// what this app runs. It is deliberately NOT applied to appDB, where migrations
+// and reporting queries may legitimately run long.
+const PRACTICE_STATEMENT_TIMEOUT_MS = 5000;
+
+const practiceDbHooks = {
+	afterConnect: (connection) =>
+		new Promise((resolve) => {
+			connection.query(
+				`SET SESSION max_execution_time = ${PRACTICE_STATEMENT_TIMEOUT_MS}`,
+				(error) => {
+					if (error) {
+						// Don't fail the connection — an older/variant server that
+						// doesn't support the variable should still work, just without
+						// the cap.
+						console.warn(
+							"Could not set max_execution_time on practice connection:",
+							error.message
+						);
+					}
+					resolve();
+				}
+			);
+		}),
+};
+
+// Practice pools get more headroom than the original 5 so one slow query can't
+// immediately block everyone. Note `acquire` is a WAIT timeout, not an
+// execution timeout — the statement timeout above is what bounds the query.
+const practicePool = {
+	max: 10,
+	min: 0,
+	acquire: 30000,
+	idle: 10000,
+};
+
 // MySQL connection configuration for ClassicModels
 const classicModelsDB = new Sequelize({
 	dialect: "mysql",
@@ -10,12 +54,8 @@ const classicModelsDB = new Sequelize({
 	password: process.env.DB_PASSWORD,
 	database: process.env.DB_NAME, // ClassicModels
 	logging: process.env.NODE_ENV === "development" ? console.log : false,
-	pool: {
-		max: 5,
-		min: 0,
-		acquire: 30000,
-		idle: 10000,
-	},
+	pool: practicePool,
+	hooks: practiceDbHooks,
 	define: {
 		charset: "utf8mb4",
 		collate: "utf8mb4_unicode_ci",
@@ -33,12 +73,8 @@ const northwindDB = new Sequelize({
 	password: process.env.DB_PASSWORD,
 	database: "northwind",
 	logging: process.env.NODE_ENV === "development" ? console.log : false,
-	pool: {
-		max: 5,
-		min: 0,
-		acquire: 30000,
-		idle: 10000,
-	},
+	pool: practicePool,
+	hooks: practiceDbHooks,
 	define: {
 		charset: "utf8mb4",
 		collate: "utf8mb4_unicode_ci",
@@ -56,12 +92,8 @@ const textDB = new Sequelize({
 	password: process.env.DB_PASSWORD,
 	database: "Text",
 	logging: process.env.NODE_ENV === "development" ? console.log : false,
-	pool: {
-		max: 5,
-		min: 0,
-		acquire: 30000,
-		idle: 10000,
-	},
+	pool: practicePool,
+	hooks: practiceDbHooks,
 	define: {
 		charset: "utf8mb4",
 		collate: "utf8mb4_unicode_ci",
