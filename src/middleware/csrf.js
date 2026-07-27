@@ -44,10 +44,11 @@ function verifyCsrf(req, res, next) {
 	}
 
 	const sessionToken = req.session && req.session.csrfToken;
-	const submitted =
-		req.get("x-csrf-token") ||
-		(req.body && req.body._csrf) ||
-		req.query._csrf;
+	// Header and body only. A token accepted from the query string would leak
+	// into access logs, browser history, and Referer headers sent to the
+	// cross-origin CDNs the templates load — and nothing in this app ever sends
+	// it that way.
+	const submitted = req.get("x-csrf-token") || (req.body && req.body._csrf);
 
 	if (sessionToken && tokensMatch(submitted, sessionToken)) {
 		return next();

@@ -59,10 +59,15 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/auth/logout" style="color: var(--muted) !important;"
-                           title="Logout">
-                            <i class="bi bi-box-arrow-right"></i>
-                        </a>
+                        <!-- POST, not a link: a GET logout can be triggered by any
+                             third-party page with <img src=".../auth/logout">. The
+                             CSRF interceptor injects the token into this form. -->
+                        <form action="/auth/logout" method="POST" class="d-inline">
+                            <button type="submit" class="nav-link btn btn-link p-0 border-0"
+                                    style="color: var(--muted) !important;" title="Logout">
+                                <i class="bi bi-box-arrow-right"></i>
+                            </button>
+                        </form>
                     </li>
                 <% } else { %>
                     <li class="nav-item">

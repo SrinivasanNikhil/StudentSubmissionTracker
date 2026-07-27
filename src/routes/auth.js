@@ -534,13 +534,23 @@ router.post("/reset-password/:token", isNotAuthenticated, async (req, res) => {
 });
 
 // Logout
-router.get("/logout", isAuthenticated, (req, res) => {
+// Logout is a POST so it cannot be triggered cross-site. A GET logout can be
+// fired by any third-party page containing <img src="https://host/auth/logout">,
+// forcing a victim to lose their session mid-assignment. CSRF verification
+// applies to POST, so the request must carry this session's token.
+router.post("/logout", isAuthenticated, (req, res) => {
 	req.session.destroy((err) => {
 		if (err) {
 			console.error("Error destroying session:", err);
 		}
 		res.redirect("/auth/login");
 	});
+});
+
+// A bookmarked or typed /auth/logout should not 404 — send it to the login page,
+// where the user can sign out via the header control if still authenticated.
+router.get("/logout", (req, res) => {
+	res.redirect("/auth/login");
 });
 
 module.exports = router;

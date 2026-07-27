@@ -254,6 +254,15 @@ router.get(
 					associatedInstructorId: instructorId,
 					role: "student",
 				},
+				// Never load credential material into a render context.
+				attributes: {
+					exclude: [
+						"passwordHash",
+						"resetToken",
+						"resetTokenExpires",
+						"resetTokenUsed",
+					],
+				},
 			});
 
 			if (!student) {
@@ -752,7 +761,6 @@ router.post(
 			res.status(500).json({
 				success: false,
 				message: "Error updating submission",
-				error: error.message,
 			});
 		}
 	}

@@ -383,8 +383,6 @@ router.get("/admin/submissions/:id", isInstructorOrAdmin, async (req, res) => {
 				) {
 					showCopyButton = true;
 					aiScoreData = submission.aiScore;
-					console.log(aiScoreData);
-					console.log(evaluation.analysis);
 					aiFeedbackData = evaluation.analysis
 						.replace(/"/g, "&quot;")
 						.replace(/\n/g, "&#10;");
@@ -463,7 +461,6 @@ router.post("/admin/submissions/:id", isInstructorOrAdmin, async (req, res) => {
 		res.status(500).json({
 			success: false,
 			message: "Error updating submission",
-			error: error.message,
 		});
 	}
 });
@@ -545,7 +542,6 @@ router.post(
 			res.status(500).json({
 				success: false,
 				message: "Error triggering AI evaluation",
-				error: error.message,
 			});
 		}
 	}
@@ -684,8 +680,6 @@ Provide a score from 0-10 and summarize feedback and suggestions for improvement
 				}
 			}
 		}
-		console.log(aiAnalysis);
-		console.log(aiScore);
 		return { aiAnalysis, aiScore };
 	} catch (error) {
 		console.warn("AI evaluation failed:", error.message);

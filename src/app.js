@@ -78,8 +78,16 @@ app.use(
 	session({
 		secret: process.env.SESSION_SECRET,
 		store: sessionStore,
-		resave: true, // Changed to true to ensure session is saved
-		saveUninitialized: true, // Changed to true to save new sessions
+		// `resave: true` rewrote the session row on EVERY request even when
+		// nothing changed — pure write amplification against the shared database.
+		// The store is backed by Sequelize and handles concurrent access, so the
+		// setting resave guards against does not apply here.
+		resave: false,
+		// Don't persist sessions that were never written to. Note this is a
+		// partial win: attachCsrfToken mints a token on each request, which marks
+		// the session dirty, so page views still create a row — unavoidable while
+		// the login form itself needs CSRF protection.
+		saveUninitialized: false,
 		rolling: true,
 		cookie: {
 			httpOnly: true,
@@ -167,8 +175,10 @@ app.get("/forgot-password", isNotAuthenticated, (req, res) => {
 	res.redirect("/auth/forgot-password");
 });
 
-app.get("/logout", isAuthenticated, (req, res) => {
-	res.redirect("/auth/logout");
+// Logout is a POST (see src/routes/auth.js); this legacy GET path just lands
+// the user on the login page rather than performing a state change.
+app.get("/logout", (req, res) => {
+	res.redirect("/auth/login");
 });
 
 // Home route
