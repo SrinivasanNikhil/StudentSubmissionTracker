@@ -17,6 +17,7 @@ const {
 	buildCompletionTermFilter,
 	getFilterOptions,
 } = require("../utils/exportHelpers");
+const { destroyUserSessions } = require("../utils/sessionRevocation");
 const { runMatrixExport, runTopicSummaryExport, runDetailedAttemptsExport } = require("../utils/exportRunners");
 
 // Admin dashboard
@@ -144,6 +145,10 @@ router.post("/users/:id/delete", isAuthenticated, isAdmin, async (req, res) => {
 
 		// Then delete the user
 		await user.destroy();
+
+		// Revoke any live sessions — otherwise the deleted user keeps browsing as
+		// an authenticated principal whose row no longer exists.
+		await destroyUserSessions(id);
 
 		// If this is an AJAX request, return JSON
 		if (req.xhr) {
@@ -350,6 +355,10 @@ router.post(
 				instructorCode,
 				isAdmin: false, // Ensure they're not admin
 			});
+
+			// Force re-login so the new role is reflected — session role is a
+			// login-time snapshot and would otherwise stay stale.
+			await destroyUserSessions(id);
 
 			res.json({
 				success: true,
@@ -676,6 +685,9 @@ router.post(
 
 			// Delete the instructor
 			await instructor.destroy();
+
+			// Revoke any live sessions for the deleted instructor.
+			await destroyUserSessions(id);
 
 			res.json({
 				success: true,

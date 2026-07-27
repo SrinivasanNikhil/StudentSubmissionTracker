@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const { User, InstructorCourseSection } = require("../models");
+const {
+	User,
+	InstructorCourseSection,
+	CourseSectionChange,
+} = require("../models");
 const { isAuthenticated, isStudent } = require("../middleware/auth");
 
 // Display profile page
@@ -222,7 +226,9 @@ router.post(
 	isStudent,
 	async (req, res) => {
 		try {
-			const { academicYear, semester, courseSection } = req.body;
+			// academicYear/semester are intentionally NOT read from the body — they
+			// are derived from the selected section record below.
+			const { courseSection } = req.body;
 			const userId = req.session.userId;
 
 			const user = await User.findByPk(userId, {
@@ -249,6 +255,25 @@ router.post(
 				return res.redirect("/profile/course-section");
 			}
 
+			// Clearing an already-set section is not permitted. Deadline and
+			// topic-visibility enforcement key off courseSection, so a student who
+			// could blank it out would escape their section's due dates entirely
+			// (clear -> submit past-due work -> restore). Setting a section for the
+			// first time, and switching between the instructor's active sections,
+			// both remain self-service.
+			if (!(courseSection && courseSection.trim()) && user.courseSection) {
+				req.session.error =
+					"Your course section can't be removed once set. Choose a different section, or ask your instructor if you need it cleared.";
+				return res.redirect("/profile/course-section");
+			}
+
+			// Snapshot the previous values for the audit trail.
+			const previous = {
+				section: user.courseSection,
+				academicYear: user.academicYear,
+				semester: user.semester,
+			};
+
 			// If course section is provided, validate it exists for the instructor
 			if (courseSection && courseSection.trim()) {
 				const dashIndex = courseSection.indexOf("-");
@@ -269,30 +294,48 @@ router.post(
 					return res.redirect("/profile/course-section");
 				}
 
-				// Use the course section's academic year and semester if not provided
-				const finalAcademicYear =
-					academicYear || courseSectionExists.academicYear;
-				const finalSemester = semester || courseSectionExists.semester;
-				const finalCourseSection =
-					courseSectionExists.getFullSectionIdentifier();
-
-				// Update user with course section information
+				// Term is derived from the section record, never from the request
+				// body. Previously academicYear/semester were taken from the body,
+				// letting a student stamp an arbitrary term onto their account and
+				// move their completions in and out of term-scoped exports.
 				await user.update({
-					academicYear: finalAcademicYear,
-					semester: finalSemester,
-					courseSection: finalCourseSection,
+					academicYear: courseSectionExists.academicYear,
+					semester: courseSectionExists.semester,
+					courseSection: courseSectionExists.getFullSectionIdentifier(),
 				});
 			} else {
-				// Update with provided academic year and semester only
-				await user.update({
-					academicYear: academicYear || null,
-					semester: semester || null,
-					courseSection: null,
-				});
+				// Only reachable when the student has no section and submitted none;
+				// nothing to change (clearing an existing section is rejected above).
+				req.session.error = "Please select a course section.";
+				return res.redirect("/profile/course-section");
 			}
 
 			// Reload so the spread below reads committed DB values, not the pre-update instance
 			await user.reload();
+
+			// Record the change for instructor review. Switching between sections is
+			// still allowed and those sections can carry different due dates, so the
+			// movement is worth auditing. Non-blocking: a logging failure must not
+			// fail the update.
+			if (previous.section !== user.courseSection) {
+				try {
+					await CourseSectionChange.create({
+						userId: user.id,
+						previousSection: previous.section,
+						newSection: user.courseSection,
+						previousAcademicYear: previous.academicYear,
+						newAcademicYear: user.academicYear,
+						previousSemester: previous.semester,
+						newSemester: user.semester,
+						changedAt: new Date(),
+					});
+				} catch (auditError) {
+					console.error(
+						"CourseSectionChange audit write failed (non-blocking):",
+						auditError.message
+					);
+				}
+			}
 
 			// Update session data
 			req.session.user = {

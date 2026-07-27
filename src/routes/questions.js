@@ -35,6 +35,25 @@ function termCompletionFilter(sessionUser) {
 	return {};
 }
 
+// Helper: is this topic hidden for the requesting user's course section?
+//
+// Visibility used to be enforced only on GET /questions/topic/:topicId, so a
+// student could reach any question in a hidden topic by guessing its id
+// (/questions/123) and could execute, get AI feedback on, and bank completions
+// against unreleased material.
+//
+// Returns false for admins, instructors, and students without a resolvable
+// section — getStudentSection() is null for all of them, so staff previewing
+// content is unaffected.
+async function isTopicHiddenForUser(sessionUser, topicId) {
+	const section = await getStudentSection(sessionUser);
+	if (!section) return false;
+	const setting = await InstructorSectionTopicSetting.findOne({
+		where: { instructorCourseSectionId: section.id, topicId },
+	});
+	return Boolean(setting && setting.isVisible === false);
+}
+
 // Helper: compute due-date status, accounting for an optional grace period
 function getDeadlineStatus(dueDate, gracePeriodMinutes) {
 	if (!dueDate) return { isPastDue: false, isPastGrace: false };
@@ -407,6 +426,12 @@ router.get("/:id", isAuthenticated, async (req, res) => {
 			});
 		}
 
+		// Hidden topics are not reachable by direct question id
+		if (await isTopicHiddenForUser(req.session.user, question.topicId)) {
+			req.flash("error", "That topic is not available for your course section.");
+			return res.redirect("/topics");
+		}
+
 		// Check if the user has completed this question in their current term
 		const completion = await Completion.findOne({
 			where: {
@@ -524,6 +549,13 @@ router.post("/:id/execute", isAuthenticated, async (req, res) => {
 			return res.status(404).json({
 				success: false,
 				message: "Question not found",
+			});
+		}
+
+		if (await isTopicHiddenForUser(req.session.user, question.topicId)) {
+			return res.status(403).json({
+				success: false,
+				message: "That topic is not available for your course section.",
 			});
 		}
 
@@ -857,6 +889,13 @@ router.post("/:id/analyze-syntax", isAuthenticated, async (req, res) => {
 			});
 		}
 
+		if (await isTopicHiddenForUser(req.session.user, question.topicId)) {
+			return res.status(403).json({
+				success: false,
+				message: "That topic is not available for your course section.",
+			});
+		}
+
 		const prompt = `You are a MySQL TA helping a student for the following question:
 
 Question: ${question.questionText}
@@ -1067,6 +1106,13 @@ router.post("/:id/submit-model", isAuthenticated, async (req, res) => {
 			return res.status(404).json({
 				success: false,
 				message: "Question not found",
+			});
+		}
+
+		if (await isTopicHiddenForUser(req.session.user, question.topicId)) {
+			return res.status(403).json({
+				success: false,
+				message: "That topic is not available for your course section.",
 			});
 		}
 
