@@ -1,5 +1,7 @@
 # Column Matching Enhancement for Calculated Columns
 
+> **Status (verified 2026-07-27): accurate.** The three-pass `compareColumnNames` algorithm described here still matches `src/services/sqlExecutor.js`. Kept as the record of why column matching is fuzzy.
+
 ## Problem
 
 The SQL query completion logic was failing to properly match calculated columns when students and reference solutions used different aliases or no aliases at all. This was causing valid student answers to be marked as incorrect.

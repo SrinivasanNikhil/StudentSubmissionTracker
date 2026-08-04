@@ -1,5 +1,26 @@
 # SST: Interaction Logging + AI Feedback Toggle — Implementation Spec
 
+> **Status (verified 2026-07-27): partly implemented. Read this as a historical spec, not as a
+> description of the running system.**
+>
+> **Shipped as specified** — the `InteractionLog` model, its migration, the `logInteraction()`
+> helper, and the `POST /:id/log-reveal` endpoint all match this document.
+>
+> **Never shipped / since removed** — everything describing the *AI feedback toggle*: CHANGE 4
+> (`POST /toggle-ai-feedback`), CHANGE 6 (`#ai-toggle-card` on the question page), CHANGE 7 (the
+> profile toggle panel), and the `aiFeedbackEnabled` guard in CHANGE 5d. No such route or UI
+> exists. AI feedback is instead triggered by an explicit **"Get AI Feedback" button**, and access
+> is governed by the **credit system** (see `CLAUDE.md`), not by a per-user on/off switch. The
+> `User.aiFeedbackEnabled` column still exists but is never read or written.
+>
+> **Renamed** — CHANGE 5d refers to `POST /:id/analyze-realtime`; the real endpoint is
+> `POST /:id/analyze-syntax`.
+>
+> **Payload has grown** — CHANGE 5c lists only `queryText, isCorrect, rowsMatch, columnsMatch,
+> columnNamesMatch` for `query_attempt`. The code also writes `studentRows`, `solutionRows`,
+> `isLate`, `executed`, `queryHash`, and `solutionError`. The last three support the rewritten
+> solution-unlock gate and broken-solution detection.
+
 ## Overview
 
 Three interconnected changes to implement together:
