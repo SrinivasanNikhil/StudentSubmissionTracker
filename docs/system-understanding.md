@@ -1,6 +1,6 @@
 # Student Submission Tracker - Working Notes
 
-_Last updated: 2026-06-02_
+_Last updated: 2026-07-27_
 
 These notes capture my current understanding of the Student Submission Tracker codebase. I will keep this document up to date and reference it when implementing future changes.
 
@@ -50,7 +50,7 @@ These notes capture my current understanding of the Student Submission Tracker c
 - `/topics` (`src/routes/topics.js`) lists available topics. For students with a `courseSection` in their session, topics with `isVisible: false` for their section are filtered out. Topics with a `dueDate` receive a warning (upcoming) or danger (past) badge. Students with no section see all topics unfiltered.
 - `/questions/topic/:topicId` shows question lists. The route first checks visibility — if the topic is hidden for the student's section, it redirects to `/topics` with a flash error. A deadline banner is shown at the top of the page when a due date exists.
 - `/questions/:id` renders details and includes solution-unlock state. The solution and ChatGPT compare button are only rendered in the HTML when `solutionUnlocked` is true (computed server-side).
-- `/questions/:id/execute` runs user SQL and records a completion when row count AND column count match (column aliases no longer block completion). If the topic's deadline has passed, the query executes normally but no completion is recorded; `pastDeadline: true` is included in the response. The `solution` field is omitted from the response until the solution is unlocked.
+- `/questions/:id/execute` runs user SQL and records a completion when row count, column count, AND column names all match — `columnNamesMatch` is fuzzy, so aliases and ordering don't block completion, but genuinely wrong columns do. If the topic's deadline has passed, the query executes normally but no completion is recorded; `pastDeadline: true` is included in the response. The `solution` field is omitted from the response until the solution is unlocked.
 - `/questions/:id/analyze` requires the solution to be unlocked (returns 403 otherwise).
 - `/questions/:id/analyze-syntax` calls OpenAI (`gpt-4.1-nano`) for on-demand HTML-formatted SQL syntax feedback. Triggered by the "Get AI Feedback" button; input is validated with `isSelectOnly()` and capped at 2000 characters before reaching the API.
 - `/questions/:id/submit-model` obtains structured JSON analysis from GPT-4 for data-model prompts.
@@ -119,7 +119,7 @@ Four features were added in one batch. This section records the key decisions an
 
 ### Phase 2 — Fuzzy completion
 
-- `POST /questions/:id/execute` in `src/routes/questions.js`: completion guard now checks `rowsMatch && columnsMatch` only (not `columnNamesMatch`).
+- ~~`POST /questions/:id/execute`: completion guard checks `rowsMatch && columnsMatch` only.~~ **Superseded** — this was reverted on 2026-06-29. The guard requires all three of `rowsMatch && columnsMatch && columnNamesMatch` (the third being the fuzzy matcher).
 - `InteractionLog.eventData` now includes `studentRows` and `solutionRows` (integer row counts from `compareQueries` return value) on every `query_attempt` event. These feed the Phase 4 unlock ratio calculation.
 - The JS comparison summary badge in `question-detail.ejs` still checks `columnsMatch && columnNamesMatch` for the display icon — that is intentional (informational only).
 
@@ -134,7 +134,7 @@ Flash messages use `req.flash("error", ...)` (connect-flash) — not `req.sessio
 ### Phase 4 — Due dates and solution unlock
 
 Key helper in `src/routes/questions.js`:
-- `getSolutionUnlockStatus(userId, questionId)` — two DB queries (completion check + interaction log count/find). Returns `{ solutionUnlocked, attemptCount, bestRatio, existingCompletion }`. Called in `GET /:id` (page render), `POST /:id/execute` (after the interaction log is written, so newly-completed questions are immediately unlocked), and `POST /:id/analyze` (403 gate).
+- `getSolutionUnlockStatus(userId, questionId)` — three DB queries (completion check + interaction log count + recent-attempt fetch). Returns `{ solutionUnlocked, attemptCount, bestProximityPct, bestRowScorePct, anyColumnsCorrect, distinctSeriousAttempts, existingCompletion }`. **Rewritten 2026-07-12**: the old single rule (5 attempts AND best `studentRows/solutionRows` ≥ 0.75) was gameable, because that ratio was uncapped — a broad `SELECT *` returning far more rows than the solution scored above 1 and unlocked instantly. There are now two independent paths: a **proximity** path (≥ `UNLOCK_MIN_ATTEMPTS` attempts AND an attempt with the correct column count *and* a **symmetric** row-closeness score ≥ `UNLOCK_ROW_PROXIMITY`) and an **effort fallback** (≥ `UNLOCK_EFFORT_DISTINCT` distinct, executed, non-`SELECT *` queries). There is no `bestRatio` field any more. Called in `GET /:id` (page render), `POST /:id/execute` (after the interaction log is written, so newly-completed questions are immediately unlocked), and `POST /:id/analyze` (403 gate).
 - The `solution` field in `POST /:id/execute` responses is set to `null` when locked, preventing clients from reading it via network inspection.
 - Due date enforcement skips completion creation but still executes the query and returns results — students can practice after the deadline, just not earn credit.
 - `datetime-local` input values in `section-topics.ejs` are formatted using local-time components (`getFullYear/getMonth/getDate/getHours/getMinutes`), not `toISOString().slice(0,16)` (which would show UTC time in the input).
@@ -159,3 +159,36 @@ Key helper in `src/routes/questions.js`:
 ---
 
 I will reference this document before implementing future modifications and update sections when the architecture or behavior changes.
+
+---
+
+## Changes since these notes were written (2026-07)
+
+Recorded here rather than rewritten inline, so the older narrative stays readable.
+
+- **Completions are per-term.** The unique key is `(userId, questionId, academicYear, semester)`,
+  not `(userId, questionId)`. The old key silently blocked students **retaking** the course from
+  earning any completion at all. A legacy duplicate index enforcing the old rule was dropped in the
+  same change. Student-facing reads scope to the current term via `termCompletionFilter()`.
+
+- **Deadlines are true UTC instants.** `dueDate` was previously stored as a naive wall clock, so on
+  the UTC production server an intended "11:59 PM Eastern" deadline closed 4–5 hours early.
+  `src/utils/timezone.js` now owns the conversion (`COURSE_TZ = America/New_York`), the save path
+  goes through `parseDatetimeLocalToUtc()`, and the instructor input is repopulated server-side via
+  `utcToDatetimeLocal()` — `section-topics.ejs` no longer does client-side date formatting. Displays
+  carry an explicit zone label.
+
+- **Reference-solution failures are surfaced honestly.** `compareQueries` returns a distinct
+  `solutionError` shape when the *reference* solution fails to execute, instead of comparing the
+  student's valid result against an empty one and showing a bogus "expected 0 rows and 0 columns".
+  Use `src/scripts/verify-solutions.js` to catch these.
+
+- **Topic visibility is enforced on every question route**, not just the topic list, so hidden
+  topics can't be reached by guessing a question id.
+
+- **AI usage is metered on all model-backed routes**, including for students with no course
+  section, and each call writes a `CreditTransaction` with token counts and estimated cost.
+
+- Security hardening: CSRF tokens, session regeneration on login, session revocation on
+  delete/role-change/password-reset, authenticated serving of uploaded diagrams, per-user rate
+  limits, and a statement timeout on the practice databases. See `CLAUDE.md` for specifics.

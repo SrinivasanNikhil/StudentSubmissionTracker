@@ -9,14 +9,18 @@ A comprehensive web application designed to help university students track and m
 - **User Authentication**: Secure login and registration system with role-based access (student/instructor/admin)
 - **Password Reset**: Secure password reset functionality with email verification and token-based authentication
 - **SQL Practice**: Interactive SQL question practice with real-time query execution
-- **Fuzzy Completion**: Questions are marked complete when row count and column count match — column alias differences no longer block completion
-- **Solution Unlock**: Reference solution and AI comparison are hidden until a student has made ≥ 5 attempts with at least 75% of expected rows matched (or the question is already completed)
-- **Due Date Awareness**: Topics with deadlines show warning/danger badges; submitting after the deadline still executes the query but does not record a completion
+- **Fuzzy Completion**: Questions are marked complete when the row count, the column count, **and** the column names all match. Column-name matching is fuzzy (alias and ordering differences are tolerated), but selecting genuinely different columns still fails
+- **Solution Unlock**: The reference solution and AI comparison stay hidden until one of two paths is met (or the question is already completed):
+  - **Proximity** — ≥ 5 attempts, and one attempt got the correct **column count** *and* landed within 25% of the expected row count. The row score is symmetric, so returning far *more* rows than expected scores as poorly as too few — a broad `SELECT *` cannot unlock anything.
+  - **Effort fallback** — ≥ 10 **distinct**, successfully executed, non-`SELECT *` queries, so a genuinely stuck student is never permanently locked out. Repeating one query counts once.
+- **Due Date Awareness**: Topics with deadlines show warning/danger badges. Instructors can set a **grace period**; a correct answer submitted after the due date but still inside the grace window is recorded normally. Once the grace window closes the query still executes but no completion is recorded. Deadlines are stored as true UTC instants and displayed in the course timezone with an explicit label (e.g. "Jul 9, 2026, 11:59 PM EDT")
 - **Assignment/Practice Badges**: Each topic shows whether it's classified as a graded Assignment or ungraded Practice for the student's course section, on both the topics list and the question list
 - **ER Diagram Submissions**: Upload and submit ER diagrams for data modeling questions
 - **Progress Tracking**: Monitor completion status across all topics and question types
 - **Student Dashboard**: View submitted diagrams and instructor feedback
 - **Profile Management**: Update personal information and track individual progress
+- **Course Section Self-Service**: Students set their own course section, or switch between their instructor's active sections. A section cannot be *cleared* once set (deadline and visibility enforcement depend on it), and every change is recorded in an audit trail for the instructor
+- **AI Feedback Credits**: On-demand AI feedback is metered. Students in a section draw on an instructor-configured balance and can request more; students without a section get a default per-term allowance
 - **Semester Integration**: Automatic semester and academic year tracking for all submissions
 - **Course Section Association**: Register with specific instructor course sections
 
@@ -37,7 +41,7 @@ A comprehensive web application designed to help university students track and m
 - **Enhanced User Management**: View and manage all user accounts with detailed role information
 - **Advanced Instructor Management**: Comprehensive instructor oversight with course section details
 - **ER Diagram Review**: Review submitted ER diagrams with AI evaluation assistance
-- **AI-Powered Evaluation**: Automated ER diagram analysis using OpenAI GPT-4 Vision
+- **AI-Powered Evaluation**: Automated ER diagram analysis using OpenAI `gpt-4o` (vision)
 - **Manual Review Tools**: Copy AI evaluations to admin review fields for human oversight
 - **Submission Analytics**: Track submission patterns and completion rates
 - **Semester-Based Reporting**: Export and analyze data by academic year, semester, and course section
@@ -45,8 +49,8 @@ A comprehensive web application designed to help university students track and m
 
 ### AI-Powered Features
 
-- **🤖 Intelligent SQL Query Analysis**: AI-powered query comparison and feedback using OpenAI GPT-4
-- **🔍 Automated ER Diagram Evaluation**: Advanced computer vision analysis using OpenAI GPT-4 Vision API
+- **🤖 Intelligent SQL Query Analysis**: AI-powered query comparison and feedback using OpenAI `gpt-4.1-nano`
+- **🔍 Automated ER Diagram Evaluation**: Advanced computer vision analysis using OpenAI `gpt-4o` (vision)
 - **📊 Smart Query Validation**: Real-time SQL query analysis with detailed feedback and suggestions
 - **📈 Intelligent Scoring System**: Automated 0-10 scoring with comprehensive feedback
 - **🔄 AI-Assisted Review Process**: Streamlined admin review with AI-generated evaluations
@@ -56,18 +60,18 @@ A comprehensive web application designed to help university students track and m
 - **File Upload System**: Secure PNG file upload for ER diagrams with validation
 - **Real-time SQL Execution**: Execute SQL queries against multiple databases
 - **Responsive Design**: Mobile-friendly interface using Bootstrap 5
-- **Session Management**: Secure session handling with SQLite storage
+- **Session Management**: Secure session handling persisted to the MySQL application database via `connect-session-sequelize`
 - **Password Security**: Advanced password validation with strength requirements
 - **Role-Based Access Control**: Granular permissions for students, instructors, and administrators
 
 ## Tech Stack
 
 - **Backend**: Node.js, Express.js
-- **Database**: MySQL (with SQLite support)
+- **Database**: MySQL (all tiers)
 - **Frontend**: EJS templates, Bootstrap 5, JavaScript
-- **Authentication**: Session-based with bcrypt password hashing
+- **Authentication**: Session-based, with `bcryptjs` password hashing and CSRF protection
 - **File Upload**: Multer for secure file handling
-- **🤖 AI Integration**: OpenAI GPT-4 and GPT-4 Vision APIs for intelligent analysis
+- **🤖 AI Integration**: OpenAI API — `gpt-4.1-nano` for SQL feedback and comparison, `gpt-4o` for data-model grading and ER-diagram vision scoring
 - **ORM**: Sequelize for database operations
 - **Email**: Nodemailer for password reset notifications
 - **Migration System**: Umzug for database schema management
@@ -173,7 +177,6 @@ StudentSubmissionTracker/
 │   ├── app.js              # Main application setup
 │   └── server.js           # Server entry point
 ├── public/                  # Static assets (CSS, JS, images)
-├── database.sqlite         # SQLite database file (if using SQLite)
 └── package.json            # Project dependencies and scripts
 ```
 
@@ -193,7 +196,7 @@ StudentSubmissionTracker/
 - **Multiple Databases**: Support for ClassicModels and Northwind databases
 - **Real-time Feedback**: Immediate query results and error handling
 - **Progress Tracking**: Automatic completion tracking for correct solutions
-- **🤖 AI-Powered Query Analysis**: Intelligent query comparison and feedback using OpenAI GPT-4
+- **🤖 AI-Powered Query Analysis**: Intelligent query comparison and feedback using OpenAI `gpt-4.1-nano`
 - **📊 Smart Query Validation**: Real-time analysis with detailed suggestions and improvements
 
 ### ER Diagram Submission System
@@ -202,12 +205,12 @@ StudentSubmissionTracker/
 - **Student Enhancements**: Students explain modifications to base scenarios
 - **AI Tool Reflection**: Students reflect on AI tool usage in their work
 - **Student View**: Dedicated page for students to view their submissions
-- **🔍 AI-Powered Diagram Analysis**: Advanced computer vision evaluation using OpenAI GPT-4 Vision
+- **🔍 AI-Powered Diagram Analysis**: Advanced computer vision evaluation using OpenAI `gpt-4o` (vision)
 - **📈 Automated Scoring**: Intelligent 0-10 scoring with detailed feedback
 
 ### AI Evaluation System
 
-- **🤖 Automated Analysis**: OpenAI GPT-4 Vision analyzes ER diagrams with advanced computer vision
+- **🤖 Automated Analysis**: OpenAI `gpt-4o` (vision) analyzes ER diagrams with advanced computer vision
 - **📈 Intelligent Scoring System**: Automated 0-10 scoring with comprehensive feedback
 - **🔄 AI-Assisted Review Process**: Streamlined admin review with AI-generated evaluations
 - **📊 Detailed Feedback**: Comprehensive analysis including strengths, weaknesses, and improvement suggestions
@@ -231,15 +234,40 @@ StudentSubmissionTracker/
 - **Progress Monitoring**: Track student progress across all course sections
 - **Data Export**: Export Center with semester/section-filtered reporting (see Export Center feature above)
 
+### AI Feedback Credit System
+
+On-demand AI feedback is metered so OpenAI spend is bounded and attributable.
+
+- **Per-section policy** — instructors set `defaultCredits`, `costPerRequest`, and an `unlimited`
+  toggle per course section (`/instructor/course-management/course-sections/:id/credits`), and can
+  grant credits to individual students.
+- **Students without a course section** draw on a default per-term allowance instead of being
+  unmetered.
+- **Every call is logged** to `CreditTransaction` with token counts and estimated USD cost, whether
+  or not it was charged — this is the authoritative record for cost analysis. Read historical cost
+  from the ledger row, never by recomputing from the current `costPerRequest`.
+- **Running out** returns HTTP 403 with `code: "NO_CREDITS"`; the question page then offers an
+  inline "request more credits" form. Instructors resolve requests at
+  `/instructor/credit-requests`.
+- Balances carry over when a student switches sections within a term, so switching cannot be used
+  to reset an allowance.
+
 ## Database Models
 
 - **User**: Manages user accounts, authentication, role-based access, and semester tracking
 - **Topic**: Organizes learning topics (SQL, Data Modeling)
 - **Question**: Stores questions with solutions and expected outputs
-- **Completion**: Tracks user progress and submissions with semester information
-- **Session**: Manages user sessions for authentication
+- **Completion**: Tracks user progress and submissions. **Unique per `(user, question, academicYear, semester)`** — a student who retakes the course earns completions again in the new term while prior-term records are preserved
+- **InteractionLog**: Append-only event log (`query_attempt`, `answer_revealed`, `ai_feedback_requested`) that powers solution-unlock scoring, the detailed-attempts export, and research analysis
+- **CourseSectionChange**: Audit trail of students changing their own course section
 - **InstructorCourseSection**: Manages course sections with semester and academic year tracking
 - **InstructorSectionTopicSetting**: Per-section, per-topic configuration — stores `isVisible` (whether the topic is shown to students in a section), `dueDate` (optional deadline after which completions are not recorded), `gracePeriodMinutes` (grace window after the due date during which completions still count), and `assignmentType` (`assignment` or `practice` classification, default `practice`). One row per `(section, topic)` pair; rows are created on first save and upserted on subsequent changes
+- **InstructorSectionCreditSetting**: Per-section AI credit policy — `defaultCredits`, `costPerRequest`, and an `unlimited` toggle
+- **StudentCreditBalance**: Per-student, per-term AI credit balance
+- **CreditTransaction**: Append-only credit ledger (`seed`/`spend`/`grant`/`refund`) carrying token counts and estimated USD cost — the authoritative record for AI spend analysis
+- **CreditRequest**: Student requests for additional AI credits, resolved by the instructor
+
+> Note: the `Sessions` table is created automatically by `connect-session-sequelize` and has no Sequelize model file.
 
 ## API Endpoints
 
@@ -261,7 +289,7 @@ StudentSubmissionTracker/
 - `GET /questions/topic/:id` - Questions by topic
 - `GET /questions/:id` - Question details
 - `POST /questions/:id/execute` - Execute SQL queries
-- `POST /questions/:id/analyze` - 🤖 Analyze queries with AI using OpenAI GPT-4
+- `POST /questions/:id/analyze` - 🤖 Analyze queries with AI using OpenAI `gpt-4.1-nano`
 - `POST /questions/:id/submit-model` - Submit data model answers
 
 ### ER Diagram Submissions
@@ -269,7 +297,7 @@ StudentSubmissionTracker/
 - `GET /er-diagrams/submit/:questionId` - Submission form
 - `POST /er-diagrams/submit/:questionId` - Submit ER diagram
 - `GET /er-diagrams/my-submission/:questionId` - Student view
-- `POST /er-diagrams/admin/submissions/:id/evaluate` - 🔍 AI evaluation using OpenAI GPT-4 Vision
+- `POST /er-diagrams/admin/submissions/:id/evaluate` - 🔍 AI evaluation using OpenAI `gpt-4o` (vision)
 
 ### Admin Routes
 
@@ -303,15 +331,16 @@ StudentSubmissionTracker/
 - **express**: Web framework
 - **sequelize**: ORM for database operations
 - **ejs**: Templating language
-- **bcrypt**: Password hashing
+- **bcryptjs**: Password hashing (pure JS — the native `bcrypt` package is deliberately *not* used; it needs platform compilation and pulls in a vulnerable `node-gyp` toolchain)
 - **express-session**: Session management
-- **mysql2**: MySQL database driver
-- **sqlite3**: SQLite database driver (optional)
+- **express-rate-limit**: Request throttling on auth, query-execution, and AI endpoints
+- **helmet**: Security headers
+- **mysql2**: MySQL database driver (the only driver — this project is MySQL-only)
 
 ### File Upload & AI
 
 - **multer**: File upload handling
-- **openai**: 🤖 OpenAI GPT-4 and GPT-4 Vision API integration for intelligent analysis
+- **openai**: 🤖 OpenAI API integration (`gpt-4.1-nano` for SQL feedback, `gpt-4o` for data-model and ER-diagram grading)
 
 ### Email & Authentication
 
@@ -383,8 +412,22 @@ node src/scripts/run-semester-migration.js
 ### Password Reset Testing
 
 ```bash
-node test-password-reset.js
+node test-password-validation.js
 ```
+
+### Operational Scripts
+
+All of these are **dry-run by default** and require `--apply` to write. Run them with `node`.
+
+| Script | Purpose |
+|---|---|
+| `src/scripts/verify-solutions.js` | Executes **every** stored reference solution against its topic's database and exits non-zero if any fail. Run after any content change — a solution that fails to execute otherwise shows students a misleading "expected 0 rows and 0 columns" instead of an error |
+| `src/scripts/fix-broken-solutions.js` | Applies validated corrections to broken reference solutions; each fix is executed successfully before it is written |
+| `src/scripts/regrade-attempts.js` | Replays students' logged attempts against corrected solutions and credits completions at the original attempt time, honoring the deadline in force then |
+| `src/scripts/repair-retake-completions.js` | Backfills missing current-term completions for students retaking a course, from their interaction logs. `--scan` lists affected students |
+
+Also available as npm scripts: `npm run cleanup-and-recreate`, `npm run inspect-text-db`,
+`npm run test-completion`, `npm run test-analyze`, `npm run test-column-matching`.
 
 ### Environment Setup
 
@@ -400,11 +443,16 @@ Ensure all required environment variables are set in `.env`:
 ## Security Features
 
 - **Password Requirements**: Strong password validation with multiple criteria
-- **Session Security**: Secure session handling with automatic cleanup
-- **Token-Based Reset**: Secure password reset with time-limited tokens
+- **Session Security**: Session ID regenerated on login and registration (prevents fixation); sessions revoked on account deletion, role change, and password reset. The app refuses to start without a real `SESSION_SECRET`
+- **CSRF Protection**: Per-session synchronizer token enforced on every state-changing request, with a client interceptor that attaches it to forms and AJAX automatically
+- **Security Headers**: `helmet` applied globally
+- **Rate Limiting**: On authentication endpoints (by IP) and on query-execution and AI endpoints (by user, so a shared campus IP isn't throttled collectively)
+- **Token-Based Reset**: Secure password reset with time-limited tokens, cleared after use
 - **Input Validation**: Comprehensive input validation and sanitization
 - **SQL Injection Protection**: Parameterized queries via Sequelize
-- **XSS Protection**: Template escaping and content security
+- **Read-Only Query Sandbox**: Student SQL must be a `SELECT`/`WITH` statement; destructive keywords and file access (`OUTFILE`, `DUMPFILE`, `LOAD_FILE`) are rejected before reaching the database, and practice connections carry a statement timeout so an expensive query cannot stall the system
+- **XSS Protection**: Template escaping, plus explicit escaping/sanitizing helpers for anything injected into the DOM (including AI output)
+- **Protected File Access**: Uploaded ER diagrams are served through an authenticated route (owner, their instructor, or an admin only) — never as static files. Uploads are verified by PNG magic bytes, not by the client-supplied content type
 - **Role-Based Access Control**: Granular permissions for different user types
 
 ## Recent Updates
@@ -415,7 +463,7 @@ Ensure all required environment variables are set in `.env`:
 - ✅ **Per-Section Due Dates**: Instructors can set a per-topic deadline per course section. After the deadline, queries still execute and results are shown, but completions are not recorded. Warning/danger badges appear on topic and question-list pages
 - ✅ **Solution Unlock Threshold**: The reference solution and ChatGPT comparison are hidden until a student has ≥ 5 attempts with ≥ 75% row match, or the question is already completed. The solution is also excluded from the execute API response until unlocked
 - ✅ **Fuzzy Completion**: Questions are marked complete when row count and column count both match. Column alias or ordering differences no longer block completion (they are still shown as informational differences in the UI)
-- ✅ **🤖 Enhanced AI Capabilities**: Advanced OpenAI GPT-4 and GPT-4 Vision integration for intelligent analysis
+- ✅ **🤖 Enhanced AI Capabilities**: Advanced OpenAI `gpt-4.1-nano` and `gpt-4o` integration for intelligent analysis
 - ✅ **🔍 AI-Powered Query Analysis**: Intelligent SQL query comparison and feedback system
 - ✅ **📊 Automated ER Diagram Evaluation**: Computer vision-based diagram analysis with detailed scoring
 - ✅ **Enhanced Role-Based System**: Comprehensive student, instructor, and admin role management
@@ -436,11 +484,11 @@ The application leverages cutting-edge artificial intelligence to provide intell
 - **Intelligent Query Comparison**: AI analyzes student SQL queries against expected solutions
 - **Context-Aware Feedback**: Provides targeted suggestions based on question requirements
 - **Learning-Focused Guidance**: Offers educational feedback to help students improve
-- **Real-time Analysis**: Instant feedback using OpenAI GPT-4 for query evaluation
+- **Real-time Analysis**: Instant feedback using OpenAI `gpt-4.1-nano` for query evaluation
 
 ### 🔍 ER Diagram Evaluation
 
-- **Computer Vision Analysis**: Advanced image analysis using OpenAI GPT-4 Vision API
+- **Computer Vision Analysis**: Advanced image analysis using OpenAI `gpt-4o` (vision)
 - **Visual Understanding**: AI interprets diagram elements, relationships, and design patterns
 - **Comprehensive Feedback**: Provides strengths, weaknesses, and improvement suggestions
 

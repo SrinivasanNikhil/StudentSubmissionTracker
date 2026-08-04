@@ -1,5 +1,7 @@
 # SQL Query Completion Logic Update
 
+> **Status (verified 2026-07-27): accurate.** Completion still requires `rowsMatch && columnsMatch && columnNamesMatch`. Note that completions are now also unique **per term** — see `CLAUDE.md` — so a student retaking the course earns them again.
+
 ## Overview
 
 The SQL query completion logic has been updated to require **BOTH rows AND columns to match** the expected solution, instead of just checking row count equality.
