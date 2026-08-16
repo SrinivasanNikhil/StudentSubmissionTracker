@@ -2,6 +2,10 @@
 const { Model, DataTypes, Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
 
+// How long a password reset token stays valid. Single source of truth for both
+// createPasswordReset() and refreshPasswordReset().
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+
 module.exports = (sequelize) => {
 	class User extends Model {
 		async validatePassword(password) {
@@ -62,7 +66,9 @@ module.exports = (sequelize) => {
 
 		static async createPasswordReset(user) {
 			const resetToken = await this.generateResetToken();
-			const resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+			const resetTokenExpires = new Date(
+				Date.now() + PASSWORD_RESET_TTL_MS
+			);
 
 			await user.update({
 				resetToken,
@@ -71,6 +77,18 @@ module.exports = (sequelize) => {
 			});
 
 			return resetToken;
+		}
+
+		// Used when a user re-requests a reset while their existing token is still
+		// valid: keep the same token (so a link already sitting in their inbox
+		// keeps working) but give it a full window again, otherwise a resend late
+		// in the hour hands them a link that expires within minutes.
+		static async refreshPasswordReset(user) {
+			await user.update({
+				resetTokenExpires: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+			});
+
+			return user.resetToken;
 		}
 
 		static async validateResetToken(token) {
