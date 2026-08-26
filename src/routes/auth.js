@@ -376,18 +376,14 @@ router.post("/forgot-password", isNotAuthenticated, passwordResetLimiter, async 
 				user.resetTokenExpires > new Date() &&
 				!user.resetTokenUsed;
 
-			if (hasValidToken) {
-				// Don't issue a new token while a valid one exists
-				return res.render("pages/forgot-password", {
-					title: "Forgot Password",
-					error: null,
-					success:
-						"If an account with that email exists, a password reset link has been sent.",
-				});
-			}
-
-			// Generate and store a new reset token
-			const resetToken = await User.createPasswordReset(user);
+			// Don't issue a *new* token while a valid one exists — but do still send
+			// the email. This branch used to return the success message without
+			// sending anything, so if the first email failed to deliver, every
+			// retry for the next hour silently no-opped while telling the user a
+			// link had been sent.
+			const resetToken = hasValidToken
+				? await User.refreshPasswordReset(user)
+				: await User.createPasswordReset(user);
 
 			// Send email
 			const emailSent = await emailService.sendPasswordResetEmail(
