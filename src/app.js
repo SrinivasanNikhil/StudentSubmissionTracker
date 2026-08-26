@@ -12,6 +12,7 @@ const {
 	sequelize,
 } = require("./config/database");
 const { loadReferenceData } = require("./utils/referenceLoader");
+const { assetUrl } = require("./utils/assetVersion");
 const createDatabase = require("./config/create-db");
 const SequelizeStore = require("connect-session-sequelize")(session.Store);
 
@@ -46,6 +47,15 @@ app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 app.use(expressLayouts);
 app.set("layout", "layouts/main");
+
+// Cache-busted URLs for local static assets. Registered ahead of the session
+// and body-parser middleware so that res.locals.assetUrl is always defined by
+// the time anything can render — including the error page, which uses the same
+// layout and would otherwise fail to render when one of those middlewares errors.
+app.use((req, res, next) => {
+	res.locals.assetUrl = assetUrl;
+	next();
+});
 
 // Middleware
 app.use(express.json());
