@@ -709,7 +709,12 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                 }
 
                 // Handle completion status update
-                if (result.isCompleted && !result.pastDeadline) {
+                // Completion is gated server-side on the GRACE cutoff (due date +
+                // gracePeriodMinutes), not the raw due date — so the UI must key off
+                // pastGrace too. Keying off pastDeadline told students answering
+                // inside the grace window that their answer "was not counted" when
+                // the server had in fact recorded it.
+                if (result.isCompleted && !result.pastGrace) {
                     // Update badge
                     const badge = document.getElementById('completion-badge');
                     if (badge) {
@@ -727,13 +732,22 @@ Territories (TerritoryID, TerritoryDescription, RegionID)</code></pre>
                     feedbackBox.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i><strong>Question completed.</strong> Your query matches the expected output.<% if (typeof nextId !== "undefined" && nextId) { %> <a href="/questions/<%= nextId %>" class="ms-2 fw-medium" style="color:#15803d;">Next question →</a><% } %>';
                 }
 
-                // Handle past-deadline notices
+                // Handle past-deadline notices. Two distinct states:
+                //   pastGrace            — cutoff passed; completions are not recorded
+                //   pastDeadline only    — due date passed but still inside the grace
+                //                          window; completions ARE still recorded
                 if (result.pastDeadline && feedbackBox) {
                     const sep = feedbackBox.innerHTML ? '<br>' : '';
-                    if (result.isCompleted) {
-                        feedbackBox.innerHTML += sep + '<span class="text-warning"><i class="bi bi-clock-history me-1"></i>Your query is correct, but the deadline for this topic has passed. Your answer was not counted toward your completion record.</span>';
+                    if (result.pastGrace) {
+                        if (result.isCompleted) {
+                            feedbackBox.innerHTML += sep + '<span class="text-warning"><i class="bi bi-clock-history me-1"></i>Your query is correct, but the deadline for this topic has passed. Your answer was not counted toward your completion record.</span>';
+                        } else {
+                            feedbackBox.innerHTML += sep + '<span class="text-secondary"><i class="bi bi-clock-history me-1"></i>This topic\'s deadline has passed. You can continue to practice, but completions are no longer recorded.</span>';
+                        }
+                    } else if (result.isCompleted) {
+                        feedbackBox.innerHTML += sep + '<span class="text-secondary"><i class="bi bi-clock-history me-1"></i>Submitted after the due date, within the grace period — this completion counts.</span>';
                     } else {
-                        feedbackBox.innerHTML += sep + '<span class="text-secondary"><i class="bi bi-clock-history me-1"></i>This topic\'s deadline has passed. You can continue to practice, but completions are no longer recorded.</span>';
+                        feedbackBox.innerHTML += sep + '<span class="text-secondary"><i class="bi bi-clock-history me-1"></i>The due date has passed, but you are within the grace period — a correct answer will still count.</span>';
                     }
                 }
 
